@@ -961,25 +961,40 @@ function App(){
   const[showSettings,setShowSettings]=useState(false);
   const[tabKey,setTabKey]=useState(0);
   const[syncing,setSyncing]=useState(false);
-  const[loaded,setLoaded]=useState(false);
+  const[loaded,setLoaded]=useState(true); // render immediately, sync in background
+  const sbReady=useRef(false); // true once initial Supabase load completes
 
-  useEffect(()=>{lsSave("events8",events);if(loaded)sched("events8",events);},[events]);
-  useEffect(()=>{lsSave("tasks8",tasks);if(loaded)sched("tasks8",tasks);},[tasks]);
-  useEffect(()=>{lsSave("simpleLists8",simpleLists);if(loaded)sched("simpleLists8",simpleLists);},[simpleLists]);
-  useEffect(()=>{lsSave("calendars8",calendars);if(loaded)sched("calendars8",calendars);},[calendars]);
-  useEffect(()=>{lsSave("dark8",dark);if(loaded)sbSetSetting("dark8",String(dark));},[dark]);
-  useEffect(()=>{lsSave("accent8",accent);if(loaded)sbSetSetting("accent8",accent);},[accent]);
+  useEffect(()=>{lsSave("events8",events);if(sbReady.current)sched("events8",events);},[events]);
+  useEffect(()=>{lsSave("tasks8",tasks);if(sbReady.current)sched("tasks8",tasks);},[tasks]);
+  useEffect(()=>{lsSave("simpleLists8",simpleLists);if(sbReady.current)sched("simpleLists8",simpleLists);},[simpleLists]);
+  useEffect(()=>{lsSave("calendars8",calendars);if(sbReady.current)sched("calendars8",calendars);},[calendars]);
+  useEffect(()=>{lsSave("dark8",dark);if(sbReady.current)sbSetSetting("dark8",String(dark));},[dark]);
+  useEffect(()=>{lsSave("accent8",accent);if(sbReady.current)sbSetSetting("accent8",accent);},[accent]);
 
   const syncT=useRef(null);
   function sched(key,data){clearTimeout(syncT.current);syncT.current=setTimeout(async()=>{setSyncing(true);await sbUpsert(key,data);setSyncing(false);},1400);}
 
   useEffect(()=>{
+    // Safety timeout — if Supabase takes >4s, just use local data
+    const timeout = setTimeout(()=>{sbReady.current=true;}, 4000);
     async function load(){
-      const[ev,tk,sl,ca,d,ac]=await Promise.all([sbGet("events8"),sbGet("tasks8"),sbGet("simpleLists8"),sbGet("calendars8"),sbGetSetting("dark8"),sbGetSetting("accent8")]);
-      if(ev)setEvents(ev);if(tk)setTasks(tk.filter(t=>!t.isCourseTask));if(sl)setSimpleLists(sl);if(ca)setCalendars(ca);
-      if(d!==null)setDark(d==="true");if(ac)setAccent(ac);setLoaded(true);
+      try {
+        const[ev,tk,sl,ca,d,ac]=await Promise.all([
+          sbGet("events8"),sbGet("tasks8"),sbGet("simpleLists8"),sbGet("calendars8"),
+          sbGetSetting("dark8"),sbGetSetting("accent8")
+        ]);
+        if(ev)setEvents(ev);
+        if(tk)setTasks(tk.filter(t=>!t.isCourseTask));
+        if(sl)setSimpleLists(sl);
+        if(ca)setCalendars(ca);
+        if(d!==null)setDark(d==="true");
+        if(ac)setAccent(ac);
+      } catch(e){ /* fall through to local data */ }
+      clearTimeout(timeout);
+      sbReady.current=true;
     }
     load();
+    return()=>clearTimeout(timeout);
   },[]);
 
   useEffect(()=>{
