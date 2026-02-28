@@ -22,7 +22,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 </head>
 <body>
-  <div id="root"><div class="loading"><div class="spin">⭐</div><div style="font-size:14px">Loading planner…</div></div></div>
+  <div id="root"></div>
   <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef, useCallback } = React;
 
@@ -975,26 +975,27 @@ function App(){
   function sched(key,data){clearTimeout(syncT.current);syncT.current=setTimeout(async()=>{setSyncing(true);await sbUpsert(key,data);setSyncing(false);},1400);}
 
   useEffect(()=>{
-    // Safety timeout — if Supabase takes >4s, just use local data
-    const timeout = setTimeout(()=>{sbReady.current=true;}, 4000);
-    async function load(){
+    // Load from localStorage immediately (already done via useState defaults)
+    // Then try Supabase in background with a strict 5s timeout per request
+    sbReady.current = true; // allow saves immediately
+    async function syncFromCloud(){
       try {
-        const[ev,tk,sl,ca,d,ac]=await Promise.all([
-          sbGet("events8"),sbGet("tasks8"),sbGet("simpleLists8"),sbGet("calendars8"),
-          sbGetSetting("dark8"),sbGetSetting("accent8")
+        const withTimeout = (p) => Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),5000))]);
+        const [ev,tk,sl,ca,d,ac] = await Promise.all([
+          withTimeout(sbGet("events8")), withTimeout(sbGet("tasks8")),
+          withTimeout(sbGet("simpleLists8")), withTimeout(sbGet("calendars8")),
+          withTimeout(sbGetSetting("dark8")), withTimeout(sbGetSetting("accent8")),
         ]);
-        if(ev)setEvents(ev);
-        if(tk)setTasks(tk.filter(t=>!t.isCourseTask));
-        if(sl)setSimpleLists(sl);
-        if(ca)setCalendars(ca);
-        if(d!==null)setDark(d==="true");
-        if(ac)setAccent(ac);
-      } catch(e){ /* fall through to local data */ }
-      clearTimeout(timeout);
-      sbReady.current=true;
+        // Only overwrite local if cloud has more recent data (non-empty)
+        if(ev && ev.length > 0) setEvents(ev);
+        if(tk && tk.length > 0) setTasks(tk.filter(t=>!t.isCourseTask));
+        if(sl && sl.length > 0) setSimpleLists(sl);
+        if(ca && ca.length > 0) setCalendars(ca);
+        if(d !== null) setDark(d==="true");
+        if(ac) setAccent(ac);
+      } catch(e){ /* Supabase unavailable, keep local data */ }
     }
-    load();
-    return()=>clearTimeout(timeout);
+    syncFromCloud();
   },[]);
 
   useEffect(()=>{
