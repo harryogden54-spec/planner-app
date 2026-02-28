@@ -185,6 +185,14 @@ function EventModal({ev,cals,onSave,onDel,onClose,P,mobile}){
     isSingleTime:false,location:"",notes:"",links:"",isMultiDay:false,multiDayEnd:"",
     showColorFill:false,urgent:false,done:false,recurring:false,recurringDays:[]};
   const[f,sf]=useState(init);
+  // If no calendars exist, show a prompt to create one first
+  if(cals.length===0) return <Overlay onClose={onClose} P={P} mobile={mobile}>
+    <div style={{textAlign:"center",padding:"10px 0 20px"}}>
+      <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:8}}>No calendars yet</div>
+      <div style={{fontSize:14,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginBottom:20,lineHeight:1.6}}>You need at least one calendar before adding events.<br/>Go to the sidebar and click <strong>Add calendar</strong>.</div>
+      <Btn onClick={onClose} v="ghost" P={P}>Close</Btn>
+    </div>
+  </Overlay>;
   const set=(k,v)=>sf(p=>({...p,[k]:v}));
   const toggleDay=d=>set("recurringDays",f.recurringDays.includes(d)?f.recurringDays.filter(x=>x!==d):[...f.recurringDays,d]);
   return <Overlay onClose={onClose} P={P} mobile={mobile}>
@@ -408,7 +416,7 @@ function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskTogg
 }
 
 // ── Tasks View ────────────────────────────────────────────────────────────────
-function TasksView({tasks,setTasks,P,mobile}){
+function TasksView({tasks,setTasks,P,mobile,courseTasks}){
   const[lists,setLists]=useState(()=>lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]));
   const[active,setActive]=useState(()=>{const s=lsGet("tlists9",[{id:"list1"}]);return s[0]?.id||"list1";});
   const[modal,setModal]=useState(null);
@@ -440,6 +448,26 @@ function TasksView({tasks,setTasks,P,mobile}){
         <div style={{fontSize:mobile?17:21,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{lists.find(l=>l.id===active)?.name||""}</div>
         <Btn onClick={()=>setModal({new:true})} P={P} small={mobile}>+ New Task</Btn>
       </div>
+      {courseTasks&&courseTasks.length>0&&<div style={{marginBottom:16}}>
+        <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+          From Courses
+          <span style={{background:P.al,color:P.accent,borderRadius:20,padding:"1px 8px",fontSize:11,fontWeight:700}}>{courseTasks.length}</span>
+        </div>
+        {courseTasks.map((ct,i)=><Card key={ct.id} P={P} style={{marginBottom:5,padding:"10px 14px",borderLeft:"4px solid "+(ct.cc||P.accent),animation:"slideUp 0.2s ease "+(i*15)+"ms both"}}>
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",background:ct.cc||P.accent,flexShrink:0,marginTop:5}}/>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:2}}>
+                {ct.urgent&&<Pill color={P.accent} bg={P.al} style={{fontSize:10}}>overdue</Pill>}
+                <span style={{fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ct.title}</span>
+              </div>
+              <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{ct.notes}</div>
+              <div style={{fontSize:11,color:P.accent,fontFamily:"'DM Sans',sans-serif",marginTop:2,fontWeight:500}}>Due: {ct.dueDate}</div>
+            </div>
+          </div>
+        </Card>)}
+        <div style={{height:1,background:P.border,margin:"12px 0"}}/>
+      </div>}
       {lt.length===0&&<Card P={P} style={{textAlign:"center",padding:38,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing here yet.</Card>}
       {lt.map((t,i)=>{const cd=countdown(t.dueDate);return <Card key={t.id} P={P} onClick={()=>setModal(t)} style={{marginBottom:6,padding:"11px 15px",borderLeft:"4px solid "+(t.urgent?P.accent:P.border),animation:"slideUp 0.25s ease "+(i*18)+"ms both",opacity:t.done?0.5:1}}>
         <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
@@ -521,21 +549,17 @@ function ListsView({lists,setLists,P,mobile}){
 }
 
 // ── Courses ───────────────────────────────────────────────────────────────────
-function CoursesView({P,mobile}){
-  const[courses,setCourses]=useState(()=>lsGet("courses9",[]));
-  const[checks,setChecks]=useState(()=>lsGet("checks9",{}));
+function CoursesView({P,mobile,courses,setCourses,checks,setChecks}){
   const[notes,setNotes]=useState(()=>lsGet("cnotes9",{}));
   const[view,setView]=useState("course");
   const[activeWk,setActiveWk]=useState(CW);
-  const[activeC,setActiveC]=useState(()=>{const c=lsGet("courses9",[]);return c[0]?.id||"";});
+  const[activeC,setActiveC]=useState(()=>courses[0]?.id||"");
   const[addingC,setAddingC]=useState(false);
   const[newC,setNewC]=useState({code:"",name:"",color:"#c13b2e",columns:["Watched Lecture","Done Readings"]});
   const[editC,setEditC]=useState(null);
   const[addColFor,setAddColFor]=useState(null);
   const[newCol,setNewCol]=useState("");
   const CCOLS=["#c13b2e","#1c2f5e","#2e7d4e","#7a4a6a","#c9853a","#1a6a7a","#c9a84c","#7a3a1a"];
-  useEffect(()=>{lsSet("courses9",courses);},[courses]);
-  useEffect(()=>{lsSet("checks9",checks);},[checks]);
   useEffect(()=>{lsSet("cnotes9",notes);},[notes]);
   const wks=Array.from({length:TW},(_,i)=>i+1);
   const ac=courses.find(c=>c.id===activeC)||courses[0]||null;
@@ -756,11 +780,13 @@ function App(){
   useEffect(()=>{
     async function load(){
       try{
-        const[ev,tk,sl,ca,d,ac]=await Promise.all([sbGet("ev9"),sbGet("tk9"),sbGet("sl9"),sbGet("ca9"),sbGetS("dark9"),sbGetS("accent9")]);
+        const[ev,tk,sl,ca,co,ck,d,ac]=await Promise.all([sbGet("ev9"),sbGet("tk9"),sbGet("sl9"),sbGet("ca9"),sbGet("co9"),sbGet("ck9"),sbGetS("dark9"),sbGetS("accent9")]);
         if(ev&&ev.length)setEvents(ev);
         if(tk&&tk.length)setTasks(tk.filter(t=>!t.isCourseTask));
         if(sl&&sl.length)setSlists(sl);
         if(ca&&ca.length)setCals(ca);
+        if(co&&co.length)setCourses(co);
+        if(ck&&Object.keys(ck).length)setChecks(ck);
         if(d!==null)setDark(d==="true");
         if(ac)setAccent(ac);
       }catch(e){}
@@ -792,7 +818,7 @@ function App(){
   },[tab]);
 
   function switchTab(t){setTab(t);setTabKey(k=>k+1);}
-  function doReset(){["events9","tasks9","slists9_data","cals9","checks9","cnotes9","courses9","tlists9"].forEach(k=>localStorage.removeItem(k));setEvents([]);setTasks([]);setSlists([]);setCals([]);setShowSettings(false);}
+  function doReset(){["events9","tasks9","slists9_data","cals9","checks9","cnotes9","courses9","tlists9"].forEach(k=>localStorage.removeItem(k));setEvents([]);setTasks([]);setSlists([]);setCals([]);setCourses([]);setChecks({});setShowSettings(false);}
 
   function getWkStart(off){const n=new Date();const s=new Date(n);s.setDate(n.getDate()-n.getDay()+off*7);s.setHours(0,0,0,0);return s;}
   const wkStart=getWkStart(wkOff);
@@ -808,10 +834,14 @@ function App(){
   function wkLabel2(){const ws=wkStart,we=new Date(ws);we.setDate(ws.getDate()+6);const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return ws.getDate()+" "+mo[ws.getMonth()]+" – "+we.getDate()+" "+mo[we.getMonth()]+", "+ws.getFullYear();}
   function defLists(){return lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]);}
 
-  // Course tasks for week panel (computed live)
+  // Course state lifted to App so courseTasks updates reactively
+  const[courses,setCourses]=useState(()=>lsGet("courses9",[]));
+  const[checks,setChecks]=useState(()=>lsGet("checks9",{}));
+  useEffect(()=>{lsSet("courses9",courses);if(sbReady.current)sched("co9",courses);},[courses]);
+  useEffect(()=>{lsSet("checks9",checks);if(sbReady.current)sched("ck9",checks);},[checks]);
+
+  // Course tasks computed live — shown in week panel AND tasks tab
   const courseTasks=(()=>{
-    const checks=lsGet("checks9",{});
-    const courses=lsGet("courses9",[]);
     const result=[];
     for(let w=1;w<=TW;w++){
       courses.forEach(c=>{
@@ -858,15 +888,20 @@ function App(){
             {t.badge&&<span style={{marginLeft:"auto",background:P.accent,color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</span>}
           </button>)}
 
-          {(tab==="month"||tab==="week")&&cals.length>0&&<div style={{marginTop:14,borderTop:"1px solid "+P.border,paddingTop:10}}>
+          {(tab==="month"||tab==="week")&&<div style={{marginTop:14,borderTop:"1px solid "+P.border,paddingTop:10}}>
             <div style={{fontSize:10,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",padding:"0 6px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>Calendars</div>
-            {cals.map(c=><div key={c.id} onClick={()=>setCals(p=>p.map(x=>x.id===c.id?{...x,visible:x.visible===false?true:false}:x))}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",borderRadius:8,cursor:"pointer",marginBottom:2,opacity:c.visible===false?0.4:1,transition:"all 0.15s"}}
+            {cals.length===0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",padding:"4px 6px 8px",fontStyle:"italic"}}>No calendars yet</div>}
+            {cals.map(c=><div key={c.id} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 6px",borderRadius:8,marginBottom:2,cursor:"pointer",transition:"background 0.12s"}}
               onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <div style={{width:9,height:9,borderRadius:"50%",background:c.visible===false?P.ink3:c.color,flexShrink:0,transition:"background 0.15s"}}/>
-              <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:P.ink2}}>{c.name}</span>
-              {c.visible===false&&<span style={{fontSize:9,color:P.ink3}}>hidden</span>}
+              <div onClick={()=>setCals(p=>p.map(x=>x.id===c.id?{...x,visible:x.visible===false?true:false}:x))} style={{width:9,height:9,borderRadius:"50%",background:c.visible===false?"transparent":c.color,border:"2px solid "+c.color,flexShrink:0,cursor:"pointer",transition:"all 0.15s"}}/>
+              <span onClick={()=>setCals(p=>p.map(x=>x.id===c.id?{...x,visible:x.visible===false?true:false}:x))} style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:c.visible===false?P.ink3:P.ink2,textDecoration:c.visible===false?"line-through":"none"}}>{c.name}</span>
+              <input type="color" value={c.color} onChange={e=>setCals(p=>p.map(x=>x.id===c.id?{...x,color:e.target.value}:x))} style={{width:16,height:16,border:"none",background:"none",cursor:"pointer",padding:0,flexShrink:0}}/>
+              <button onClick={()=>setCals(p=>p.filter(x=>x.id!==c.id))} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:12,lineHeight:1,padding:"0 2px",opacity:0.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>✕</button>
             </div>)}
+            <button onClick={()=>{const name=prompt("Calendar name:");if(!name||!name.trim())return;const colors=["#c13b2e","#1c2f5e","#3a7a5a","#7a4a6a","#c9853a","#1a6a7a","#5a4a8a","#c9a84c"];const color=colors[cals.length%colors.length];setCals(p=>[...p,{id:Date.now()+"",name:name.trim(),color,visible:true}]);}}
+              style={{width:"100%",marginTop:5,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:9,padding:"6px 8px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:11,color:P.ink3,transition:"all 0.12s",display:"flex",alignItems:"center",gap:5,justifyContent:"center"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>
+              <I.Plus s={11} c="currentColor"/>Add calendar
+            </button>
           </div>}
 
           {(tab==="month"||tab==="week")&&<button onClick={()=>{setEvModal("new");setPrefillDate(null);}}
@@ -900,9 +935,9 @@ function App(){
         <div style={{flex:1,overflow:"auto",padding:"20px"}}>
           {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>{setEvModal(ev);}} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={false}/>}
           {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={false} courseTasks={courseTasks}/>}
-          {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={false}/>}
+          {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={false} courseTasks={courseTasks}/>}
           {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={false}/>}
-          {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={false}/>}
+          {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={false} courses={courses} setCourses={setCourses} checks={checks} setChecks={setChecks}/>}
         </div>
       </div>
     </div>}
@@ -926,9 +961,9 @@ function App(){
       <div style={{flex:1,overflow:"auto",padding:"14px 14px 78px"}}>
         {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={true}/>}
         {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={true} courseTasks={courseTasks}/>}
-        {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={true}/>}
+        {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={true} courseTasks={courseTasks}/>}
         {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={true}/>}
-        {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={true}/>}
+        {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={true} courses={courses} setCourses={setCourses} checks={checks} setChecks={setChecks}/>}
       </div>
       <div style={{position:"fixed",bottom:0,left:0,right:0,background:P.card,borderTop:"1px solid "+P.border,display:"flex",zIndex:100,boxShadow:"0 -4px 20px "+P.sh,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {TABS.map(t=><button key={t.id} onClick={()=>switchTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"9px 4px 7px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative",transition:"all 0.15s"}}>
