@@ -905,7 +905,8 @@ function SearchBar({events,tasks,calendars,onClose,P,mobile}){
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function SettingsPanel({dark,setDark,accent,setAccent,onReset,onClose,P,mobile}){
   return(
-    <div style={mkOV(mobile)} onClick={onClose}> onClick={e=>e.stopPropagation()}>
+    <div style={mkOV(mobile)} onClick={onClose}>
+      <div style={{...mkMB(P,mobile),maxWidth:mobile?"100%":380}} onClick={e=>e.stopPropagation()}>
         {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"-8px auto 20px"}}/>}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
           <div style={{fontSize:19,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Settings</div>
