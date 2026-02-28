@@ -6,1048 +6,818 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Planner">
-  <meta name="theme-color" content="#f8f5f0">
-  <title>Planner ⭐</title>
+  <title>Planner</title>
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='white'/%3E%3Cpolygon points='90,20 110,70 165,75 125,112 138,165 90,138 42,165 55,112 15,75 70,70' fill='%23FFD700' stroke='%23c13b2e' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Caveat:wght@400;600&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
-    html,body{height:100%;overflow:hidden;}
+    html,body{height:100%;background:#f8f5f0;font-family:'DM Sans',sans-serif;}
     #root{height:100%;}
-    .loading{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;background:#f8f5f0;color:#a09890;font-family:sans-serif;}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .spin{animation:spin 2s linear infinite;font-size:36px;display:inline-block;}
+    ::-webkit-scrollbar{width:4px;height:4px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{border-radius:3px;background:#d5cfc5;}
+    ::placeholder{opacity:0.5;}
+    button:active{opacity:0.8;}
+    html{-webkit-tap-highlight-color:transparent;}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+    .day-add{opacity:0!important;}
+    div:hover>.day-add{opacity:1!important;}
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useCallback } = React;
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#a09890;font-size:14px;font-family:sans-serif;background:#f8f5f0;"><div style="font-size:36px">⭐</div>Loading…</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
 
-// ─── Fonts ────────────────────────────────────────────────────────────────────
-const FL = document.createElement("link"); FL.rel = "stylesheet";
-FL.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Caveat:wght@400;600&display=swap";
-document.head.appendChild(FL);
+// ── Supabase ────────────────────────────────────────────────────────────────
+const SB_URL="https://llszaawcnawztybbxhtm.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxsc3phYXdjbmF3enR5YmJ4aHRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyNjcwODEsImV4cCI6MjA4Nzg0MzA4MX0._TjWF8P3MD1Y793WfDTDTahFyACGjcDSVaVybl0LJ2I";
+const SBH={"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"resolution=merge-duplicates"};
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),ms))]);}
+async function sbGet(id){try{const r=await withTimeout(fetch(SB_URL+"/rest/v1/planner_data?id=eq."+id+"&select=data",{headers:SBH}),5000);if(!r.ok)return null;const rows=await r.json();return rows.length?rows[0].data:null;}catch{return null;}}
+async function sbSet(id,data){try{await withTimeout(fetch(SB_URL+"/rest/v1/planner_data",{method:"POST",headers:SBH,body:JSON.stringify({id,data,updated_at:new Date().toISOString()})}),5000);}catch{}}
+async function sbGetS(k){try{const r=await withTimeout(fetch(SB_URL+"/rest/v1/settings?key=eq."+k+"&select=value",{headers:SBH}),5000);if(!r.ok)return null;const rows=await r.json();return rows.length?rows[0].value:null;}catch{return null;}}
+async function sbSetS(k,v){try{await withTimeout(fetch(SB_URL+"/rest/v1/settings",{method:"POST",headers:SBH,body:JSON.stringify({key:k,value:v})}),5000);}catch{}}
 
-// ─── SVG Tab Icons ────────────────────────────────────────────────────────────
-const Icons = {
-  Month: ({size=22,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-    </svg>
-  ),
-  Week: ({size=22,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="4" x2="12" y2="22"/>
-    </svg>
-  ),
-  Tasks: ({size=22,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-    </svg>
-  ),
-  Lists: ({size=22,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-      <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-    </svg>
-  ),
-  Courses: ({size=22,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-    </svg>
-  ),
-  Search: ({size=18,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-  ),
-  Settings: ({size=18,color="currentColor"}) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-    </svg>
-  ),
-};
-
-// ─── App Icon ─────────────────────────────────────────────────────────────────
-const AppIcon = ({size=28}) => (
-  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="28" height="28" rx="7" fill="white"/>
-    <polygon points="14,3 17.5,10.5 26,11.5 20,17 21.5,25.5 14,21.5 6.5,25.5 8,17 2,11.5 10.5,10.5"
-      fill="#FFD700" stroke="#c13b2e" strokeWidth="1.8" strokeLinejoin="round"/>
-  </svg>
-);
-
-// ─── Supabase ─────────────────────────────────────────────────────────────────
-const SB_URL = "https://llszaawcnawztybbxhtm.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxsc3phYXdjbmF3enR5YmJ4aHRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyNjcwODEsImV4cCI6MjA4Nzg0MzA4MX0._TjWF8P3MD1Y793WfDTDTahFyACGjcDSVaVybl0LJ2I";
-const SBH = {"Content-Type":"application/json","apikey":SB_KEY,"Authorization":`Bearer ${SB_KEY}`,"Prefer":"resolution=merge-duplicates"};
-async function sbUpsert(id,data){try{await fetch(`${SB_URL}/rest/v1/planner_data`,{method:"POST",headers:SBH,body:JSON.stringify({id,data,updated_at:new Date().toISOString()})});}catch(e){}}
-async function sbGet(id){try{const r=await fetch(`${SB_URL}/rest/v1/planner_data?id=eq.${id}&select=data`,{headers:SBH});if(!r.ok)return null;const rows=await r.json();return rows.length?rows[0].data:null;}catch(e){return null;}}
-async function sbGetSetting(key){try{const r=await fetch(`${SB_URL}/rest/v1/settings?key=eq.${key}&select=value`,{headers:SBH});if(!r.ok)return null;const rows=await r.json();return rows.length?rows[0].value:null;}catch(e){return null;}}
-async function sbSetSetting(key,value){try{await fetch(`${SB_URL}/rest/v1/settings`,{method:"POST",headers:SBH,body:JSON.stringify({key,value})});}catch(e){}}
-
-// ─── Constants & helpers ──────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
 const DAYS_S=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const DAYS_F=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const TERM_START=new Date("2025-01-19T00:00:00");
+const CW=6; const TW=11;
+const R=12;
 
-// Term weeks: Week 1 = 19 Jan 2025 (Monday). Each week is 7 days.
-const TERM_WEEK_1_START = new Date("2025-01-19T00:00:00");
-const CW = 6; const TW = 11;
-
-function termWeekStartDate(weekNum) {
-  const d = new Date(TERM_WEEK_1_START);
-  d.setDate(d.getDate() + (weekNum - 1) * 7);
-  return d;
-}
-function termWeekEndDate(weekNum) {
-  const d = termWeekStartDate(weekNum);
-  d.setDate(d.getDate() + 6);
-  return d;
-}
-function fmtTermWeek(weekNum) {
-  const s = termWeekStartDate(weekNum);
-  const e = termWeekEndDate(weekNum);
-  const fmt = d => `${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}`;
-  return `${fmt(s)} – ${fmt(e)}`;
-}
-// Get which term week a date string falls in (null if outside term)
-function getTermWeekForDate(ds) {
-  const d = new Date(ds + "T00:00:00");
-  for (let w = 1; w <= TW; w++) {
-    const s = termWeekStartDate(w);
-    const e = termWeekEndDate(w);
-    if (d >= s && d <= e) return w;
-  }
-  return null;
-}
-
-const R = 14;
 function p2(n){return String(n).padStart(2,"0");}
-function todayStr(){const d=new Date();return`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
-function fmtT(t){if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"pm":"am";const hh=h%12||12;return m===0?`${hh}${ap}`:`${hh}.${p2(m)}${ap}`;}
+function today(){const d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
+function fmtT(t){if(!t)return"";const[h,m]=t.split(":").map(Number);const ap=h>=12?"pm":"am";const hh=h%12||12;return m===0?hh+ap:hh+"."+p2(m)+ap;}
 function pT(t){if(!t)return 0;const[h,m]=t.split(":").map(Number);return h*60+m;}
 function dim(y,m){return new Date(y,m+1,0).getDate();}
 function fdm(y,m){return new Date(y,m,1).getDay();}
 function lsGet(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
-function lsSave(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
-function dateAdd(n){const d=new Date();d.setDate(d.getDate()+n);return`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
-function wdayDate(n){const d=new Date();const diff=(d.getDay()+6)%7;d.setDate(d.getDate()-diff+(n-1));return`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
-function daysUntil(ds){if(!ds)return null;return Math.ceil((new Date(ds+"T00:00:00")-new Date(todayStr()+"T00:00:00"))/(86400000));}
-function fmtCountdown(ds){const d=daysUntil(ds);if(d===null)return null;if(d<0)return{label:`${Math.abs(d)}d overdue`,color:"#c13b2e"};if(d===0)return{label:"due today",color:"#c13b2e"};if(d===1)return{label:"due tomorrow",color:"#e08030"};if(d<=7)return{label:`in ${d}d`,color:"#8a7050"};return null;}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function daysUntil(ds){if(!ds)return null;return Math.ceil((new Date(ds+"T00:00:00")-new Date(today()+"T00:00:00"))/86400000);}
+function countdown(ds){const d=daysUntil(ds);if(d===null)return null;if(d<0)return{label:Math.abs(d)+"d overdue",c:"#c13b2e"};if(d===0)return{label:"today",c:"#c13b2e"};if(d===1)return{label:"tomorrow",c:"#e08030"};if(d<=7)return{label:"in "+d+"d",c:"#8a7050"};return null;}
+function wkStart(n){const d=new Date(TERM_START);d.setDate(d.getDate()+(n-1)*7);return d;}
+function wkEnd(n){const d=wkStart(n);d.setDate(d.getDate()+6);return d;}
+function wkLabel(n){const s=wkStart(n),e=wkEnd(n);const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return s.getDate()+" "+mo[s.getMonth()]+" – "+e.getDate()+" "+mo[e.getMonth()];}
+function wkDueStr(n){const e=wkEnd(n);return e.getFullYear()+"-"+p2(e.getMonth()+1)+"-"+p2(e.getDate());}
+function useWinW(){const[w,setW]=useState(window.innerWidth);useEffect(()=>{const h=()=>setW(window.innerWidth);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);return w;}
 
-// Returns all dates a recurring event falls on across a date range
-function expandRecurring(ev, startDs, endDs) {
-  if (!ev.recurring || !ev.recurringDays || ev.recurringDays.length === 0) return [];
-  const results = [];
-  const start = new Date(startDs + "T00:00:00");
-  const end = new Date(endDs + "T00:00:00");
-  const dayIdxMap = {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
-  let cur = new Date(start);
-  while (cur <= end) {
-    const dayName = DAYS_S[cur.getDay()];
-    if (ev.recurringDays.includes(dayName)) {
-      results.push(`${cur.getFullYear()}-${p2(cur.getMonth()+1)}-${p2(cur.getDate())}`);
-    }
-    cur.setDate(cur.getDate() + 1);
-  }
-  return results;
-}
-
-// ─── Palette ──────────────────────────────────────────────────────────────────
-function makeP(dark, accent="#c13b2e") {
-  const navy="#1c2f5e";
-  return dark ? {
-    bg:"#111318",bg2:"#1a1d24",bg3:"#22262f",white:"#1e2128",
+// ── Palette ──────────────────────────────────────────────────────────────────
+function mkP(dark,accent){
+  accent=accent||"#c13b2e";
+  return dark?{
+    bg:"#111318",bg2:"#1a1d24",bg3:"#22262f",card:"#1e2128",
     ink:"#f0ede8",ink2:"#a0a8b8",ink3:"#505870",
-    accent,accentLight:accent+"30",accentMid:accent+"55",
-    navy,navyLight:"#141c2e",navyMid:"#1e3050",
+    accent:accent,al:accent+"30",am:accent+"55",
+    navy:"#4a80c8",nl:"#141c2e",
     border:"#2a2e38",border2:"#343840",
-    shadow:"rgba(0,0,0,0.4)",shadow2:"rgba(0,0,0,0.6)",
-  } : {
-    bg:"#f8f5f0",bg2:"#f0ece5",bg3:"#e8e3da",white:"#ffffff",
+    sh:"rgba(0,0,0,0.4)",sh2:"rgba(0,0,0,0.6)",
+  }:{
+    bg:"#f8f5f0",bg2:"#f0ece5",bg3:"#e8e3da",card:"#ffffff",
     ink:"#1a1714",ink2:"#5a534a",ink3:"#a09890",
-    accent,accentLight:accent+"18",accentMid:accent+"44",
-    navy,navyLight:"#e6eaf4",navyMid:"#b0bcda",
+    accent:accent,al:accent+"18",am:accent+"44",
+    navy:"#1c2f5e",nl:"#e6eaf4",
     border:"#e5e0d8",border2:"#d5cfc5",
-    shadow:"rgba(26,23,20,0.07)",shadow2:"rgba(26,23,20,0.12)",
+    sh:"rgba(26,23,20,0.07)",sh2:"rgba(26,23,20,0.12)",
   };
 }
+const ACCENTS=["#c13b2e","#1c2f5e","#2e7d4e","#7a4a6a","#c9853a","#1a6a7a","#5a4a8a","#c9a84c"];
 
-const ACCENT_PRESETS=["#c13b2e","#1c2f5e","#2e7d4e","#7a4a6a","#c9853a","#1a6a7a","#7a3a1a","#5a4a8a","#c9a84c","#3a6a9a"];
-
-// ─── Default data ─────────────────────────────────────────────────────────────
-const DEF_CALS=[];
-const DEF_COURSES=[];
-
-
-function makeDemoEvents(){ return []; }
-function makeDemoTasks(){ return []; }
-function makeDemoSimpleLists(){ return []; }
-
-
-
-// ─── useWindowSize ────────────────────────────────────────────────────────────
-function useWindowSize(){
-  const[s,setS]=useState({w:window.innerWidth});
-  useEffect(()=>{const h=()=>setS({w:window.innerWidth});window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  return s;
-}
-
-// ─── Shared UI ────────────────────────────────────────────────────────────────
-function Card({children,style,onClick,P,noHover}){
+// ── UI Atoms ─────────────────────────────────────────────────────────────────
+function Card({children,style,onClick,P}){
   const[hov,setHov]=useState(false);
-  return(<div onClick={onClick} onMouseEnter={()=>!noHover&&setHov(true)} onMouseLeave={()=>setHov(false)}
-    style={{background:P.white,borderRadius:R,padding:16,border:`1px solid ${P.border}`,
-      boxShadow:hov&&onClick?`0 8px 28px ${P.shadow2}`:`0 2px 8px ${P.shadow}`,
+  return <div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:P.card,borderRadius:R,padding:14,border:"1px solid "+P.border,
+      boxShadow:hov&&onClick?"0 8px 24px "+P.sh2:"0 2px 8px "+P.sh,
       transition:"box-shadow 0.2s,transform 0.2s",transform:hov&&onClick?"translateY(-2px)":"none",
-      cursor:onClick?"pointer":"default",...style}}>{children}</div>);
+      cursor:onClick?"pointer":"default",...style}}>{children}</div>;
 }
-function Pill({children,color,bg,style}){
-  return(<span style={{display:"inline-flex",alignItems:"center",gap:4,background:bg||color+"22",color,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,...style}}>{children}</span>);
-}
-function Btn({children,onClick,variant="primary",style,small,P,disabled}){
+
+function Btn({children,onClick,v="primary",small,P,style,disabled}){
   const[hov,setHov]=useState(false);
-  const sz=small?{fontSize:12,padding:"6px 14px"}:{fontSize:13,padding:"9px 20px"};
+  const sz=small?{fontSize:12,padding:"5px 13px"}:{fontSize:13,padding:"8px 18px"};
   const vs={
-    primary:{background:disabled?"#ccc":P.accent,color:"#fff",boxShadow:hov&&!disabled?`0 4px 14px ${P.accent}55`:"none",border:"none"},
-    ghost:{background:hov?P.bg2:"transparent",color:P.ink2,border:`1px solid ${P.border2}`},
-    danger:{background:hov?P.accentLight:"transparent",color:P.accent,border:`1px solid ${P.accentMid}`},
+    primary:{background:disabled?"#ccc":P.accent,color:"#fff",border:"none",boxShadow:hov&&!disabled?"0 4px 14px "+P.accent+"55":"none"},
+    ghost:{background:hov?P.bg2:"transparent",color:P.ink2,border:"1px solid "+P.border2},
+    danger:{background:hov?P.al:"transparent",color:P.accent,border:"1px solid "+P.am},
   };
-  return(<button onClick={disabled?undefined:onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} disabled={disabled}
-    style={{display:"inline-flex",alignItems:"center",gap:6,borderRadius:10,cursor:disabled?"not-allowed":"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600,transition:"all 0.15s",...sz,...vs[variant],...style}}>{children}</button>);
+  return <button onClick={disabled?undefined:onClick} disabled={disabled}
+    onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{display:"inline-flex",alignItems:"center",gap:5,borderRadius:9,cursor:disabled?"not-allowed":"pointer",
+      fontFamily:"'DM Sans',sans-serif",fontWeight:600,transition:"all 0.15s",...sz,...vs[v],...style}}>{children}</button>;
 }
-function Inp({value,onChange,placeholder,type="text",style,multiline,rows=3,onKeyDown,P,autoFocus}){
-  const s={width:"100%",padding:"9px 13px",border:`1px solid ${P.border2}`,borderRadius:10,fontSize:13,background:P.bg,color:P.ink,outline:"none",lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",transition:"border-color 0.15s",...style};
-  const fx=e=>e.target.style.borderColor=P.accent; const bl=e=>e.target.style.borderColor=P.border2;
-  if(multiline)return<textarea autoFocus={autoFocus} value={value} onChange={onChange} placeholder={placeholder} rows={rows} onKeyDown={onKeyDown} style={{...s,resize:"vertical"}} onFocus={fx} onBlur={bl}/>;
-  return<input autoFocus={autoFocus} type={type} value={value} onChange={onChange} placeholder={placeholder} onKeyDown={onKeyDown} style={s} onFocus={fx} onBlur={bl}/>;
+
+function Inp({value,onChange,placeholder,type,style,rows,onKeyDown,P,autoFocus}){
+  const s={width:"100%",padding:"8px 12px",border:"1px solid "+P.border2,borderRadius:9,fontSize:13,
+    background:P.bg,color:P.ink,outline:"none",lineHeight:1.5,fontFamily:"'DM Sans',sans-serif",
+    transition:"border-color 0.15s",...style};
+  const fx=e=>e.target.style.borderColor=P.accent;
+  const bl=e=>e.target.style.borderColor=P.border2;
+  if(rows) return <textarea autoFocus={autoFocus} value={value} onChange={onChange} placeholder={placeholder}
+    rows={rows} onKeyDown={onKeyDown} style={{...s,resize:"vertical"}} onFocus={fx} onBlur={bl}/>;
+  return <input autoFocus={autoFocus} type={type||"text"} value={value} onChange={onChange}
+    placeholder={placeholder} onKeyDown={onKeyDown} style={s} onFocus={fx} onBlur={bl}/>;
 }
-function Lbl({children,P}){
-  return<div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:5,fontFamily:"'DM Sans',sans-serif"}}>{children}</div>;
-}
+
+function Lbl({children,P}){return <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:4,fontFamily:"'DM Sans',sans-serif"}}>{children}</div>;}
+function Pill({children,color,bg,style}){return <span style={{display:"inline-flex",alignItems:"center",background:bg||color+"22",color:color,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:600,...style}}>{children}</span>;}
+function Bar({pct,color,P,style}){return <div style={{height:3,background:P.bg3,borderRadius:2,overflow:"hidden",...style}}><div style={{height:"100%",width:Math.min(pct,100)+"%",background:color||P.accent,borderRadius:2,transition:"width 0.5s"}}/></div>;}
+
 function Check({checked,onChange,color,P}){
-  return(<div onClick={e=>{e.stopPropagation();onChange();}} style={{width:20,height:20,borderRadius:6,flexShrink:0,border:`2px solid ${checked?color||P.accent:P.border2}`,background:checked?color||P.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
+  return <div onClick={e=>{e.stopPropagation();onChange();}}
+    style={{width:20,height:20,borderRadius:6,flexShrink:0,border:"2px solid "+(checked?color||P.accent:P.border2),
+      background:checked?color||P.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
     {checked&&<svg width="10" height="8" viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-  </div>);
+  </div>;
 }
-function ProgBar({pct,color,P,style}){
-  return(<div style={{height:3,background:P.bg3,borderRadius:2,overflow:"hidden",...style}}>
-    <div style={{height:"100%",width:`${Math.min(pct,100)}%`,background:color||P.accent,borderRadius:2,transition:"width 0.5s ease"}}/>
-  </div>);
-}
-function SyncDot({syncing,P}){
-  if(!syncing)return null;
-  return(<div style={{position:"fixed",bottom:16,right:16,background:P.white,border:`1px solid ${P.border}`,borderRadius:10,padding:"5px 12px",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",boxShadow:`0 4px 14px ${P.shadow}`,zIndex:200,display:"flex",alignItems:"center",gap:6}}>
+
+function Sync({on,P}){
+  if(!on)return null;
+  return <div style={{position:"fixed",bottom:14,right:14,background:P.card,border:"1px solid "+P.border,borderRadius:9,padding:"5px 12px",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 4px 12px "+P.sh,zIndex:300,display:"flex",alignItems:"center",gap:6}}>
     <div style={{width:7,height:7,borderRadius:"50%",background:P.accent,animation:"pulse 1s infinite"}}/>Syncing…
-  </div>);
+  </div>;
 }
-const mkOV=(mobile)=>({position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1000,display:"flex",alignItems:mobile?"flex-end":"stretch",justifyContent:mobile?"center":"flex-end",backdropFilter:"blur(5px)",animation:"fadeIn 0.2s ease both"});
-const mkMB=(P,mobile)=>mobile
-  ?{background:P.white,borderRadius:"20px 20px 0 0",padding:"24px 24px 32px",width:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,0.2)",animation:"slideUp 0.25s ease both"}
-  :{background:P.white,borderRadius:0,padding:"28px 28px 32px",width:480,maxWidth:"100%",height:"100%",overflowY:"auto",boxShadow:"-8px 0 40px rgba(0,0,0,0.15)",animation:"slideInRight 0.25s ease both",borderLeft:"1px solid rgba(0,0,0,0.08)"};
-function FR({label,children,P}){return<div style={{marginBottom:16}}><Lbl P={P}>{label}</Lbl>{children}</div>;}
-function SelSt(P){return{width:"100%",padding:"9px 13px",border:`1px solid ${P.border2}`,borderRadius:10,fontSize:13,background:P.bg,color:P.ink,outline:"none",fontFamily:"'DM Sans',sans-serif"};}
 
-// ─── Event Modal ──────────────────────────────────────────────────────────────
-function EventModal({event,calendars,onSave,onDelete,onClose,P,mobile}){
-  const[f,sf]=useState(event||{id:Date.now().toString(),title:"",calendarId:calendars[0]?.id||"",date:todayStr(),startTime:"",endTime:"",isSingleTime:false,location:"",notes:"",links:"",isMultiDay:false,multiDayEnd:"",showColorFill:false,urgent:false,done:false,recurring:false,recurringDays:[]});
-  const s=(k,v)=>sf(p=>({...p,[k]:v}));
-  function toggleRecDay(d){s("recurringDays",f.recurringDays.includes(d)?f.recurringDays.filter(x=>x!==d):[...f.recurringDays,d]);}
-  return(<div style={mkOV(mobile)} onClick={onClose}><div style={mkMB(P,mobile)} onClick={e=>e.stopPropagation()}>
-    {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"-8px auto 20px"}}/>}
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-      <div style={{fontSize:19,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{event?"Edit Event":"New Event"}</div>
-      <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3,padding:"4px 8px"}}>✕</button>
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+const I={
+  Star:({s=24})=><svg width={s} height={s} viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="7" fill="white"/><polygon points="14,3 17.5,10.5 26,11.5 20,17 21.5,25.5 14,21.5 6.5,25.5 8,17 2,11.5 10.5,10.5" fill="#FFD700" stroke="#c13b2e" strokeWidth="1.8" strokeLinejoin="round"/></svg>,
+  Month:({s=20,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="14" width="3" height="3" rx="0.5" fill={c} stroke="none"/><rect x="14" y="14" width="3" height="3" rx="0.5" fill={c} stroke="none"/></svg>,
+  Week:({s=20,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="17" y2="15"/><line x1="7" y1="19" x2="13" y2="19"/></svg>,
+  Tasks:({s=20,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
+  Lists:({s=20,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill={c} stroke="none"/><circle cx="3.5" cy="12" r="1.5" fill={c} stroke="none"/><circle cx="3.5" cy="18" r="1.5" fill={c} stroke="none"/></svg>,
+  Courses:({s=20,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>,
+  Gear:({s=18,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  Search:({s=18,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  Plus:({s=16,c="currentColor"})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+};
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function Overlay({children,onClose,P,mobile}){
+  return <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,
+    display:"flex",alignItems:mobile?"flex-end":"center",justifyContent:"center",
+    padding:mobile?0:20,backdropFilter:"blur(4px)",animation:"fadeIn 0.2s ease both"}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:P.card,width:"100%",maxWidth:mobile?"100%":500,
+      maxHeight:mobile?"92vh":"88vh",overflowY:"auto",borderRadius:mobile?"18px 18px 0 0":14,
+      padding:"20px 22px 28px",boxShadow:mobile?"0 -8px 40px rgba(0,0,0,0.2)":"0 20px 60px rgba(0,0,0,0.2)",
+      animation:"slideUp 0.25s ease both"}}>
+      {mobile&&<div style={{width:36,height:4,borderRadius:2,background:P.border2,margin:"-6px auto 18px"}}/>}
+      {children}
     </div>
-    <FR label="Title" P={P}><Inp autoFocus value={f.title} onChange={e=>s("title",e.target.value)} placeholder="Event title..." P={P}/></FR>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FR label="Calendar" P={P}><select value={f.calendarId} onChange={e=>s("calendarId",e.target.value)} style={SelSt(P)}>{calendars.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></FR>
-      <FR label="Date" P={P}><Inp type="date" value={f.date} onChange={e=>s("date",e.target.value)} P={P}/></FR>
+  </div>;
+}
+
+function FR({label,children,P}){return <div style={{marginBottom:14}}><Lbl P={P}>{label}</Lbl>{children}</div>;}
+function Sel({value,onChange,options,P}){
+  return <select value={value} onChange={onChange} style={{width:"100%",padding:"8px 12px",border:"1px solid "+P.border2,borderRadius:9,fontSize:13,background:P.bg,color:P.ink,outline:"none",fontFamily:"'DM Sans',sans-serif"}}>
+    {options.map(o=><option key={o.v||o} value={o.v||o}>{o.l||o}</option>)}
+  </select>;
+}
+
+// ── Event Modal ───────────────────────────────────────────────────────────────
+function EventModal({ev,cals,onSave,onDel,onClose,P,mobile}){
+  const init=ev||{id:Date.now()+"",title:"",calendarId:cals[0]?.id||"",date:today(),startTime:"",endTime:"",
+    isSingleTime:false,location:"",notes:"",links:"",isMultiDay:false,multiDayEnd:"",
+    showColorFill:false,urgent:false,done:false,recurring:false,recurringDays:[]};
+  const[f,sf]=useState(init);
+  const set=(k,v)=>sf(p=>({...p,[k]:v}));
+  const toggleDay=d=>set("recurringDays",f.recurringDays.includes(d)?f.recurringDays.filter(x=>x!==d):[...f.recurringDays,d]);
+  return <Overlay onClose={onClose} P={P} mobile={mobile}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+      <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{ev?"Edit Event":"New Event"}</div>
+      <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3}}>✕</button>
     </div>
-    <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}>
-      {[["isSingleTime","Single time"],["isMultiDay","Multi-day"],["urgent","!! Urgent"],["done","Mark done"],["recurring","Repeat weekly"]].map(([k,lbl])=>(
-        <label key={k} style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13,color:k==="urgent"?P.accent:P.ink2,fontWeight:k==="urgent"?600:400,fontFamily:"'DM Sans',sans-serif"}}>
-          <Check checked={f[k]} onChange={()=>s(k,!f[k])} color={k==="urgent"?P.accent:P.navy} P={P}/>{lbl}
+    <FR label="Title" P={P}><Inp autoFocus value={f.title} onChange={e=>set("title",e.target.value)} placeholder="Event title…" P={P}/></FR>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <FR label="Calendar" P={P}><Sel value={f.calendarId} onChange={e=>set("calendarId",e.target.value)} options={cals.map(c=>({v:c.id,l:c.name}))} P={P}/></FR>
+      <FR label="Date" P={P}><Inp type="date" value={f.date} onChange={e=>set("date",e.target.value)} P={P}/></FR>
+    </div>
+    <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
+      {[["isSingleTime","Single time"],["isMultiDay","Multi-day"],["urgent","!! Urgent"],["done","Mark done"],["recurring","Recurring"]].map(([k,lb])=>
+        <label key={k} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13,color:k==="urgent"?P.accent:P.ink2,fontWeight:k==="urgent"?600:400,fontFamily:"'DM Sans',sans-serif"}}>
+          <Check checked={!!f[k]} onChange={()=>set(k,!f[k])} color={k==="urgent"?P.accent:P.navy} P={P}/>{lb}
         </label>
-      ))}
+      )}
     </div>
-    {f.recurring&&(
-      <FR label="Repeat on days" P={P}>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-          {DAYS_S.map(d=>(
-            <button key={d} onClick={()=>toggleRecDay(d)} style={{background:f.recurringDays.includes(d)?P.accent:"transparent",color:f.recurringDays.includes(d)?"#fff":P.ink2,border:`1.5px solid ${f.recurringDays.includes(d)?P.accent:P.border2}`,borderRadius:20,padding:"4px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,transition:"all 0.15s"}}>{d}</button>
-          ))}
-        </div>
-      </FR>
-    )}
-    {f.isMultiDay&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FR label="End Date" P={P}><Inp type="date" value={f.multiDayEnd} onChange={e=>s("multiDayEnd",e.target.value)} P={P}/></FR>
-      <FR label="" P={P}><label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13,color:P.ink2,marginTop:20,fontFamily:"'DM Sans',sans-serif"}}><Check checked={f.showColorFill} onChange={()=>s("showColorFill",!f.showColorFill)} P={P}/>Fill with colour</label></FR>
+    {f.recurring&&<div style={{marginBottom:14}}>
+      <Lbl P={P}>Repeat on</Lbl>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+        {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>
+          <button key={d} onClick={()=>toggleDay(d)} style={{background:f.recurringDays.includes(d)?P.accent:P.bg2,color:f.recurringDays.includes(d)?"#fff":P.ink2,border:"1.5px solid "+(f.recurringDays.includes(d)?P.accent:P.border2),borderRadius:20,padding:"3px 11px",cursor:"pointer",fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,transition:"all 0.15s"}}>{d}</button>
+        )}
+      </div>
     </div>}
-    {!f.isSingleTime&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FR label="Start" P={P}><Inp type="time" value={f.startTime} onChange={e=>s("startTime",e.target.value)} P={P}/></FR>
-      <FR label="End" P={P}><Inp type="time" value={f.endTime} onChange={e=>s("endTime",e.target.value)} P={P}/></FR>
+    {f.isMultiDay&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <FR label="End Date" P={P}><Inp type="date" value={f.multiDayEnd} onChange={e=>set("multiDayEnd",e.target.value)} P={P}/></FR>
+      <FR label="" P={P}><label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13,color:P.ink2,marginTop:18,fontFamily:"'DM Sans',sans-serif"}}><Check checked={!!f.showColorFill} onChange={()=>set("showColorFill",!f.showColorFill)} P={P}/>Fill colour</label></FR>
     </div>}
-    {f.isSingleTime&&<FR label="Time" P={P}><Inp type="time" value={f.startTime} onChange={e=>s("startTime",e.target.value)} P={P}/></FR>}
-    <FR label="Location" P={P}><Inp value={f.location} onChange={e=>s("location",e.target.value)} placeholder="Where?" P={P}/></FR>
-    <FR label="Notes" P={P}><Inp multiline value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Notes..." rows={2} P={P}/></FR>
-    <FR label="Links (one per line)" P={P}><Inp multiline value={f.links} onChange={e=>s("links",e.target.value)} placeholder="https://..." rows={2} style={{fontFamily:"monospace",fontSize:12}} P={P}/></FR>
-    <div style={{display:"flex",justifyContent:"space-between",marginTop:20,paddingBottom:mobile?16:0}}>
-      {event?<Btn onClick={()=>onDelete(event.id)} variant="danger" P={P}>Delete</Btn>:<span/>}
-      <div style={{display:"flex",gap:8}}><Btn onClick={onClose} variant="ghost" P={P}>Cancel</Btn><Btn onClick={()=>onSave(f)} P={P}>Save</Btn></div>
+    {!f.isSingleTime&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <FR label="Start" P={P}><Inp type="time" value={f.startTime} onChange={e=>set("startTime",e.target.value)} P={P}/></FR>
+      <FR label="End" P={P}><Inp type="time" value={f.endTime} onChange={e=>set("endTime",e.target.value)} P={P}/></FR>
+    </div>}
+    {f.isSingleTime&&<FR label="Time" P={P}><Inp type="time" value={f.startTime} onChange={e=>set("startTime",e.target.value)} P={P}/></FR>}
+    <FR label="Location" P={P}><Inp value={f.location} onChange={e=>set("location",e.target.value)} placeholder="Where?" P={P}/></FR>
+    <FR label="Notes" P={P}><Inp value={f.notes} onChange={e=>set("notes",e.target.value)} placeholder="Notes…" rows={2} P={P}/></FR>
+    <FR label="Links (one per line)" P={P}><Inp value={f.links} onChange={e=>set("links",e.target.value)} placeholder="https://…" rows={2} style={{fontFamily:"monospace",fontSize:12}} P={P}/></FR>
+    <div style={{display:"flex",justifyContent:"space-between",marginTop:18}}>
+      {ev?<Btn onClick={()=>onDel(ev.id)} v="danger" P={P}>Delete</Btn>:<span/>}
+      <div style={{display:"flex",gap:8}}><Btn onClick={onClose} v="ghost" P={P}>Cancel</Btn><Btn onClick={()=>onSave(f)} P={P}>Save</Btn></div>
     </div>
-  </div></div>);
+  </Overlay>;
 }
 
-// ─── Task Modal ───────────────────────────────────────────────────────────────
-function TaskModal({task,lists,onSave,onDelete,onClose,P,mobile}){
-  const[f,sf]=useState(task||{id:Date.now().toString(),title:"",listId:lists[0]?.id||"",dueDate:"",dueTime:"",notes:"",links:"",done:false,urgent:false,isCourseTask:false});
-  const s=(k,v)=>sf(p=>({...p,[k]:v}));
-  return(<div style={mkOV(mobile)} onClick={onClose}><div style={mkMB(P,mobile)} onClick={e=>e.stopPropagation()}>
-    {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"-8px auto 20px"}}/>}
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-      <div style={{fontSize:19,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{task?"Edit Task":"New Task"}</div>
-      <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3,padding:"4px 8px"}}>✕</button>
+// ── Task Modal ────────────────────────────────────────────────────────────────
+function TaskModal({task,lists,onSave,onDel,onClose,P,mobile}){
+  const[f,sf]=useState(task||{id:Date.now()+"",title:"",listId:lists[0]?.id||"",dueDate:"",dueTime:"",notes:"",links:"",done:false,urgent:false});
+  const set=(k,v)=>sf(p=>({...p,[k]:v}));
+  return <Overlay onClose={onClose} P={P} mobile={mobile}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+      <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{task?"Edit Task":"New Task"}</div>
+      <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3}}>✕</button>
     </div>
-    <FR label="Task" P={P}><Inp autoFocus value={f.title} onChange={e=>s("title",e.target.value)} placeholder="What needs doing..." P={P}/></FR>
-    <FR label="List" P={P}><select value={f.listId} onChange={e=>s("listId",e.target.value)} style={SelSt(P)}>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></FR>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-      <FR label="Due Date" P={P}><Inp type="date" value={f.dueDate} onChange={e=>s("dueDate",e.target.value)} P={P}/></FR>
-      <FR label="Due Time" P={P}><Inp type="time" value={f.dueTime} onChange={e=>s("dueTime",e.target.value)} P={P}/></FR>
+    <FR label="Task" P={P}><Inp autoFocus value={f.title} onChange={e=>set("title",e.target.value)} placeholder="What needs doing…" P={P}/></FR>
+    <FR label="List" P={P}><Sel value={f.listId} onChange={e=>set("listId",e.target.value)} options={lists.map(l=>({v:l.id,l:l.name}))} P={P}/></FR>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <FR label="Due Date" P={P}><Inp type="date" value={f.dueDate} onChange={e=>set("dueDate",e.target.value)} P={P}/></FR>
+      <FR label="Due Time" P={P}><Inp type="time" value={f.dueTime} onChange={e=>set("dueTime",e.target.value)} P={P}/></FR>
     </div>
-    <div style={{marginBottom:16}}>
-      <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13,color:P.accent,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>
-        <Check checked={f.urgent} onChange={()=>s("urgent",!f.urgent)} color={P.accent} P={P}/>!! Mark as urgent
+    <div style={{marginBottom:14}}>
+      <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13,color:P.accent,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>
+        <Check checked={!!f.urgent} onChange={()=>set("urgent",!f.urgent)} color={P.accent} P={P}/>!! Urgent
       </label>
     </div>
-    <FR label="Notes" P={P}><Inp multiline value={f.notes} onChange={e=>s("notes",e.target.value)} placeholder="Notes..." rows={2} P={P}/></FR>
-    <FR label="Links" P={P}><Inp multiline value={f.links} onChange={e=>s("links",e.target.value)} placeholder="https://..." rows={2} style={{fontFamily:"monospace",fontSize:12}} P={P}/></FR>
-    <div style={{display:"flex",justifyContent:"space-between",marginTop:20,paddingBottom:mobile?16:0}}>
-      {task?<Btn onClick={()=>onDelete(task.id)} variant="danger" P={P}>Delete</Btn>:<span/>}
-      <div style={{display:"flex",gap:8}}><Btn onClick={onClose} variant="ghost" P={P}>Cancel</Btn><Btn onClick={()=>onSave(f)} P={P}>Save</Btn></div>
+    <FR label="Notes" P={P}><Inp value={f.notes} onChange={e=>set("notes",e.target.value)} placeholder="Notes…" rows={2} P={P}/></FR>
+    <FR label="Links" P={P}><Inp value={f.links} onChange={e=>set("links",e.target.value)} placeholder="https://…" rows={2} style={{fontFamily:"monospace",fontSize:12}} P={P}/></FR>
+    <div style={{display:"flex",justifyContent:"space-between",marginTop:18}}>
+      {task?<Btn onClick={()=>onDel(task.id)} v="danger" P={P}>Delete</Btn>:<span/>}
+      <div style={{display:"flex",gap:8}}><Btn onClick={onClose} v="ghost" P={P}>Cancel</Btn><Btn onClick={()=>onSave(f)} P={P}>Save</Btn></div>
     </div>
-  </div></div>);
+  </Overlay>;
 }
 
-// ─── getEventsForDate (handles recurring) ─────────────────────────────────────
-function getEventsForDate(events, ds, visibleCalIds) {
-  return events.filter(ev => {
-    if (visibleCalIds && !visibleCalIds.includes(ev.calendarId)) return false;
-    if (ev.recurring && ev.recurringDays && ev.recurringDays.length > 0) {
-      const dayName = DAYS_S[new Date(ds + "T00:00:00").getDay()];
-      return ev.recurringDays.includes(dayName);
-    }
-    if (ev.date === ds) return true;
-    if (ev.isMultiDay && ev.multiDayEnd) return ds >= ev.date && ds <= ev.multiDayEnd;
-    return false;
-  }).sort((a,b) => pT(a.startTime) - pT(b.startTime));
-}
-
-// ─── Month View ───────────────────────────────────────────────────────────────
-function MonthView({year,month,events,tasks,calendars,onDayClick,onEventClick,onAddEvent,P,mobile}){
-  const total=dim(year,month),first=fdm(year,month),today=todayStr();
-  const visibleCalIds=calendars.filter(c=>c.visible!==false).map(c=>c.id);
+// ── Month View ────────────────────────────────────────────────────────────────
+function MonthView({year,month,events,tasks,cals,onDayClick,onEvClick,onAddEv,P,mobile}){
+  const tot=dim(year,month),fst=fdm(year,month),td=today();
   const cells=[];
-  for(let i=0;i<first;i++)cells.push(null);
-  for(let d=1;d<=total;d++)cells.push(d);
-  function ds(d){return`${year}-${p2(month+1)}-${p2(d)}`;}
-  function getItems(d){
+  for(let i=0;i<fst;i++)cells.push(null);
+  for(let d=1;d<=tot;d++)cells.push(d);
+  const visIds=new Set(cals.filter(c=>c.visible!==false).map(c=>c.id));
+  function ds(d){return year+"-"+p2(month+1)+"-"+p2(d);}
+  function getEvs(d){
     const s=ds(d);
-    const evs=getEventsForDate(events,s,visibleCalIds);
-    const tks=tasks.filter(t=>t.dueDate===s&&!t.done);
-    return{evs,tks};
+    return events.filter(e=>{
+      if(!visIds.has(e.calendarId))return false;
+      if(e.date===s)return true;
+      if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];return e.recurringDays.includes(day)&&s!==e.date;}
+      return false;
+    }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
   }
-  const minH=mobile?80:108;
-  return(
-    <div style={{animation:"slideUp 0.3s ease both"}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:8}}>
-        {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:mobile?9:11,fontWeight:600,color:P.ink3,padding:"4px 0",letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>{mobile?d[0]:d}</div>)}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:mobile?2:4}}>
-        {cells.map((d,i)=>{
-          if(!d)return<div key={`e${i}`} style={{minHeight:minH}}/>;
-          const s=ds(d),isToday=s===today;
-          const{evs,tks}=getItems(d);
-          return(
-            <div key={i} onClick={()=>onDayClick(s)}
-              style={{minHeight:minH,background:isToday?P.accentLight:P.white,borderRadius:mobile?10:R,border:`1.5px solid ${isToday?P.accent:P.border}`,padding:mobile?"5px 3px 3px":"8px 6px 6px",cursor:"pointer",position:"relative",transition:"all 0.18s",animation:`slideUp 0.3s ease ${Math.min(i,20)*5}ms both`}}
-              onMouseEnter={e=>{if(!isToday&&!mobile){e.currentTarget.style.boxShadow=`0 6px 20px ${P.shadow2}`;e.currentTarget.style.transform="translateY(-2px)";}}}
-              onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
-              <div style={{fontSize:mobile?10:12,fontWeight:isToday?700:400,color:isToday?P.accent:P.ink3,textAlign:"right",marginBottom:3,fontFamily:"'DM Sans',sans-serif"}}>{d}</div>
-              {!mobile&&evs.slice(0,3).map(ev=>{
-                const cal=calendars.find(c=>c.id===ev.calendarId),color=cal?.color||P.accent;
-                const isMid=ev.isMultiDay&&ev.multiDayEnd&&s>ev.date&&s<ev.multiDayEnd;
-                const tStr=ev.startTime&&ev.endTime?`${fmtT(ev.startTime)}–${fmtT(ev.endTime)}`:ev.startTime?fmtT(ev.startTime):"";
-                return(<div key={ev.id+s} onClick={e=>{e.stopPropagation();onEventClick(ev);}}
-                  style={{fontSize:10,lineHeight:1.35,marginBottom:3,padding:"2px 5px",borderRadius:6,background:ev.showColorFill&&isMid?color+"20":color+"15",color:ev.done?P.ink3:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:ev.done?"line-through":"none",transition:"background 0.1s",opacity:ev.done?0.5:1}}
-                  onMouseEnter={e=>e.currentTarget.style.background=color+"30"} onMouseLeave={e=>e.currentTarget.style.background=color+"15"}>
-                  <span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:color,marginRight:3,verticalAlign:"middle"}}/>
-                  {tStr&&<span style={{color:P.ink3,marginRight:2,fontSize:9}}>{tStr} </span>}
-                  {ev.title}
-                  {ev.recurring&&<span style={{fontSize:9,color:P.ink3,marginLeft:3}}>↻</span>}
-                </div>);
-              })}
-              {mobile&&evs.length>0&&<div style={{display:"flex",gap:2,flexWrap:"wrap",marginTop:2}}>
-                {evs.slice(0,3).map((ev,ii)=>{const cal=calendars.find(c=>c.id===ev.calendarId),color=cal?.color||P.accent;return<div key={ii} style={{width:6,height:6,borderRadius:"50%",background:color}}/>;})}</div>}
-              {!mobile&&tks.slice(0,1).map(t=>(
-                <div key={t.id} style={{fontSize:10,lineHeight:1.35,marginBottom:2,padding:"2px 5px",borderRadius:6,background:P.bg2,color:t.urgent?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>◦ {t.title}</div>
-              ))}
-              {!mobile&&<button onClick={e=>{e.stopPropagation();onAddEvent(s);}} className="day-add"
-                style={{position:"absolute",bottom:4,right:5,background:P.accentLight,border:`1px solid ${P.accentMid}`,borderRadius:6,cursor:"pointer",fontSize:13,color:P.accent,padding:"1px 6px",lineHeight:1.4,opacity:0,transition:"opacity 0.15s",fontWeight:700}}>+</button>}
-            </div>
-          );
-        })}
-      </div>
+  const minH=mobile?76:106;
+  return <div style={{animation:"slideUp 0.3s ease both"}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:8}}>
+      {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:mobile?9:11,fontWeight:600,color:P.ink3,padding:"3px 0",letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>{mobile?d[0]:d}</div>)}
     </div>
-  );
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:mobile?2:4}}>
+      {cells.map((d,i)=>{
+        if(!d)return <div key={"e"+i} style={{minHeight:minH}}/>;
+        const s=ds(d),isT=s===td;
+        const evs=getEvs(d);
+        const tks=tasks.filter(t=>t.dueDate===s&&!t.done);
+        return <div key={i} onClick={()=>onDayClick(s)}
+          style={{minHeight:minH,background:isT?P.al:P.card,borderRadius:mobile?9:R,border:"1.5px solid "+(isT?P.accent:P.border),padding:mobile?"4px 3px 3px":"7px 5px 5px",cursor:"pointer",position:"relative",transition:"all 0.18s"}}
+          onMouseEnter={e=>{if(!isT&&!mobile){e.currentTarget.style.boxShadow="0 6px 20px "+P.sh2;e.currentTarget.style.transform="translateY(-2px)";}}}
+          onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+          <div style={{fontSize:mobile?10:12,fontWeight:isT?700:400,color:isT?P.accent:P.ink3,textAlign:"right",marginBottom:3,fontFamily:"'DM Sans',sans-serif"}}>{d}</div>
+          {!mobile&&evs.slice(0,3).map(ev=>{
+            const cal=cals.find(c=>c.id===ev.calendarId),col=cal?cal.color:P.accent;
+            const ts=ev.startTime&&ev.endTime?fmtT(ev.startTime)+"–"+fmtT(ev.endTime):ev.startTime?fmtT(ev.startTime):"";
+            return <div key={ev.id} onClick={e=>{e.stopPropagation();onEvClick(ev);}}
+              style={{fontSize:10,lineHeight:1.35,marginBottom:3,padding:"2px 5px",borderRadius:6,background:col+"15",color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,transition:"background 0.1s"}}
+              onMouseEnter={e=>e.currentTarget.style.background=col+"30"} onMouseLeave={e=>e.currentTarget.style.background=col+"15"}>
+              <span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:col,marginRight:3,verticalAlign:"middle"}}/>
+              {ev.recurring&&<span style={{fontSize:8,color:P.ink3,marginRight:2}}>↻</span>}
+              {ts&&<span style={{color:P.ink3,marginRight:2,fontSize:9}}>{ts} </span>}
+              {ev.title}
+            </div>;
+          })}
+          {mobile&&evs.length>0&&<div style={{display:"flex",gap:2,flexWrap:"wrap",marginTop:2}}>{evs.slice(0,3).map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId);return <div key={ev.id} style={{width:5,height:5,borderRadius:"50%",background:cal?cal.color:P.accent}}/>;})}</div>}
+          {!mobile&&tks.slice(0,1).map(t=><div key={t.id} style={{fontSize:10,padding:"2px 5px",borderRadius:6,background:P.bg2,color:t.urgent?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>◦ {t.title}</div>)}
+          {!mobile&&(evs.length+tks.length)>4&&<div style={{fontSize:9,color:P.ink3,textAlign:"right"}}>+{evs.length+tks.length-4}</div>}
+          {!mobile&&<button onClick={e=>{e.stopPropagation();onAddEv(s);}} className="day-add"
+            style={{position:"absolute",bottom:3,right:4,background:P.al,border:"1px solid "+P.am,borderRadius:5,cursor:"pointer",fontSize:13,color:P.accent,padding:"0px 6px",lineHeight:1.5,opacity:0,fontWeight:700}}>+</button>}
+        </div>;
+      })}
+    </div>
+  </div>;
 }
 
-// ─── Week View ────────────────────────────────────────────────────────────────
-function WeekView({weekStart,events,tasks,calendars,highlightDate,onEventClick,onAddEvent,onTaskToggle,onTaskEdit,onAddTask,P,mobile,courseTasks}){
+// ── Week View ─────────────────────────────────────────────────────────────────
+function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskToggle,onTaskEdit,onAddTask,P,mobile,courseTasks}){
   const days=[];
-  for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);days.push({short:DAYS_S[d.getDay()],ds:`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`,date:d.getDate(),month:d.getMonth()});}
-  const today=todayStr();
-  const visibleCalIds=calendars.filter(c=>c.visible!==false).map(c=>c.id);
-  const weekTasks=tasks.filter(t=>days.some(d=>d.ds===t.dueDate)&&!t.done);
-  const wk=weekStart.toISOString().slice(0,10);
-  const[notes,setNotes]=useState(()=>lsGet(`wnotes-${wk}`,""));
-  useEffect(()=>{lsSave(`wnotes-${wk}`,notes);},[notes,wk]);
-  const todayEvs=getEventsForDate(events,today,visibleCalIds);
-  const showToday=days.some(d=>d.ds===today)&&todayEvs.length>0;
-
-  // Course tasks for this week only — match by weekNum
-  const weekCourseTasks=courseTasks.filter(ct=>days.some(d=>{
-    const ctWeek=getTermWeekForDate(d.ds);
-    return ct.weekNum===ctWeek;
-  }));
-
-  return(
-    <div style={{display:mobile?"block":"grid",gridTemplateColumns:"1fr 270px",gap:18,animation:"slideUp 0.3s ease both"}}>
-      <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {showToday&&(
-          <div style={{background:P.accentLight,border:`1.5px solid ${P.accentMid}`,borderRadius:R,padding:"11px 14px",marginBottom:4}}>
-            <div style={{fontSize:11,fontWeight:700,color:P.accent,fontFamily:"'DM Sans',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:7}}>Today at a glance</div>
-            {todayEvs.map((ev,i)=>{const cal=calendars.find(c=>c.id===ev.calendarId),color=cal?.color||P.accent;const tStr=ev.startTime&&ev.endTime?`${fmtT(ev.startTime)}–${fmtT(ev.endTime)}`:ev.startTime?fmtT(ev.startTime):"";return(
-              <div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:color,flexShrink:0}}/>
-                <span style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,flex:1}}>{ev.title}</span>
-                {tStr&&<span style={{fontSize:11,color:P.ink3}}>{tStr}</span>}
-              </div>
-            );})}
+  for(let i=0;i<7;i++){const d=new Date(wkStart);d.setDate(d.getDate()+i);days.push({short:DAYS_S[d.getDay()],ds:d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate()),date:d.getDate(),mo:d.getMonth()});}
+  const td=today();
+  const wkKey=wkStart.toISOString().slice(0,10);
+  const[notes,setNotes]=useState(()=>lsGet("wknotes-"+wkKey,""));
+  useEffect(()=>{lsSet("wknotes-"+wkKey,notes);},[notes,wkKey]);
+  const visIds=new Set(cals.filter(c=>c.visible!==false).map(c=>c.id));
+  const wkTasks=tasks.filter(t=>days.some(d=>d.ds===t.dueDate)&&!t.done);
+  const wkCourseTasks=courseTasks.filter(ct=>days.some(d=>d.ds===ct.dueDate));
+  function getEvs(s){
+    return events.filter(e=>{
+      if(!visIds.has(e.calendarId))return false;
+      if(e.date===s)return true;
+      if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];return e.recurringDays.includes(day)&&s!==e.date;}
+      return false;
+    }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
+  }
+  const tdEvs=getEvs(td);
+  const showToday=days.some(d=>d.ds===td)&&tdEvs.length>0;
+  return <div style={{display:mobile?"flex":"grid",flexDirection:mobile?"column":undefined,gridTemplateColumns:mobile?undefined:"1fr 260px",gap:16,animation:"slideUp 0.3s ease both"}}>
+    <div style={{display:"flex",flexDirection:"column",gap:5}}>
+      {showToday&&<div style={{background:P.al,border:"1.5px solid "+P.am,borderRadius:R,padding:"10px 14px",marginBottom:4}}>
+        <div style={{fontSize:11,fontWeight:700,color:P.accent,fontFamily:"'DM Sans',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:6}}>Today</div>
+        {tdEvs.map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId),col=cal?cal.color:P.accent;const ts=ev.startTime&&ev.endTime?fmtT(ev.startTime)+"–"+fmtT(ev.endTime):ev.startTime?fmtT(ev.startTime):"";return <div key={ev.id} style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}><div style={{width:6,height:6,borderRadius:"50%",background:col,flexShrink:0}}/><span style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,flex:1}}>{ev.title}</span>{ts&&<span style={{fontSize:11,color:P.ink3}}>{ts}</span>}</div>;})}
+      </div>}
+      {days.map((day,di)=>{
+        const isT=day.ds===td,isHL=day.ds===hiDate;
+        const evs=getEvs(day.ds);
+        return <div key={day.ds} style={{display:"flex",background:P.card,borderRadius:R,border:"1.5px solid "+(isHL?P.accent:isT?P.navy:P.border),overflow:"hidden",transition:"box-shadow 0.2s",animation:"slideUp 0.3s ease "+(di*30)+"ms both"}}>
+          <div style={{width:mobile?64:76,flexShrink:0,padding:mobile?"9px 8px":"12px 10px",background:isHL?P.al:isT?P.nl:P.bg2,borderRight:"1px solid "+P.border,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
+            <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",color:isHL?P.accent:isT?P.navy:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{day.short}</div>
+            <div style={{fontSize:mobile?24:26,fontWeight:300,lineHeight:1,color:isHL?P.accent:isT?P.navy:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{day.date}</div>
+            <div style={{fontSize:9,color:isHL?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{MONTHS[day.mo].slice(0,3)}</div>
           </div>
-        )}
-        {days.map((day,di)=>{
-          const isToday=day.ds===today,isHL=day.ds===highlightDate;
-          const evs=getEventsForDate(events,day.ds,visibleCalIds);
-          return(
-            <div key={day.ds} style={{display:"flex",background:P.white,borderRadius:R,border:`1.5px solid ${isHL?P.accent:isToday?P.navy:P.border}`,overflow:"hidden",boxShadow:isHL?`0 0 0 3px ${P.accentLight}`:undefined,transition:"box-shadow 0.2s",animation:`slideUp 0.3s ease ${di*30}ms both`}}>
-              <div style={{width:mobile?68:78,flexShrink:0,padding:mobile?"10px 8px":"13px 10px",background:isHL?P.accentLight:isToday?P.navyLight:P.bg2,borderRight:`1px solid ${P.border}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1}}>
-                <div style={{fontSize:9,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.1em",color:isHL?P.accent:isToday?P.navy:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{day.short}</div>
-                <div style={{fontSize:mobile?24:27,fontWeight:300,lineHeight:1,color:isHL?P.accent:isToday?P.navy:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{day.date}</div>
-                <div style={{fontSize:9,color:isHL?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{MONTHS[day.month].slice(0,3)}</div>
-              </div>
-              <div style={{flex:1,padding:mobile?"8px 10px":"10px 13px",display:"flex",flexDirection:"column",gap:3,minHeight:mobile?60:68}}>
-                {evs.length===0&&<div style={{fontSize:12,color:P.ink3,opacity:0.35,alignSelf:"center",marginTop:6}}>—</div>}
-                {evs.map((ev,ii)=>{
-                  const cal=calendars.find(c=>c.id===ev.calendarId),color=cal?.color||P.accent;
-                  const tStr=ev.startTime&&ev.endTime?`${fmtT(ev.startTime)}–${fmtT(ev.endTime)}`:ev.startTime?fmtT(ev.startTime):"";
-                  return(<div key={ii} onClick={()=>onEventClick(ev)} style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",padding:"4px 8px",borderRadius:8,background:color+"14",border:`1px solid ${color}20`,transition:"background 0.12s",opacity:ev.done?0.5:1}}
-                    onMouseEnter={e=>e.currentTarget.style.background=color+"28"} onMouseLeave={e=>e.currentTarget.style.background=color+"14"}>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:ev.done?P.ink3:color,flexShrink:0}}/>
-                    {tStr&&<span style={{fontSize:10,color:P.ink3,minWidth:mobile?0:75}}>{tStr}</span>}
-                    <span style={{fontSize:mobile?12:13,color:P.ink,flex:1,fontWeight:500,textDecoration:ev.done?"line-through":"none",fontFamily:"'DM Sans',sans-serif"}}>{ev.title}</span>
-                    {ev.recurring&&<span style={{fontSize:10,color:P.ink3}}>↻</span>}
-                    {!mobile&&ev.location&&<span style={{fontSize:10,color:P.ink3}}>📍 {ev.location}</span>}
-                  </div>);
-                })}
-                <button onClick={()=>onAddEvent(day.ds)} style={{alignSelf:"flex-start",background:P.bg2,border:`1px solid ${P.border2}`,borderRadius:6,cursor:"pointer",color:P.ink2,padding:"3px 10px",fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:500,transition:"all 0.12s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.background=P.accentLight;e.currentTarget.style.color=P.accent;e.currentTarget.style.borderColor=P.accentMid;}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink2;e.currentTarget.style.borderColor=P.border2;}}>+ add</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {/* Right panel (desktop only) */}
-      {!mobile&&(
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <Card P={P} noHover style={{padding:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:14,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>This Week</div>
-              <Btn onClick={onAddTask} small P={P}>+ Task</Btn>
-            </div>
-            {weekTasks.length===0&&weekCourseTasks.length===0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing due this week</div>}
-            {weekTasks.map(t=>{const cd=fmtCountdown(t.dueDate);return(
-              <div key={t.id} style={{display:"flex",gap:9,marginBottom:8,alignItems:"flex-start",cursor:"pointer",padding:"5px 7px",borderRadius:8,transition:"background 0.12s"}}
-                onClick={()=>onTaskEdit(t)} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <Check checked={t.done} onChange={()=>onTaskToggle(t.id)} color={t.urgent?P.accent:P.navy} P={P}/>
-                <div style={{flex:1}}>
-                  {t.urgent&&<Pill color={P.accent} bg={P.accentLight} style={{marginBottom:2,fontSize:10}}>urgent</Pill>}
-                  <div style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>
-                  {cd&&<div style={{fontSize:10,color:cd.color,fontFamily:"'DM Sans',sans-serif",fontWeight:600,marginTop:1}}>{cd.label}</div>}
-                </div>
-              </div>
-            );})}
-            {weekCourseTasks.length>0&&(
-              <>
-                <div style={{fontSize:10,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif",marginTop:8,marginBottom:4}}>From Courses</div>
-                {weekCourseTasks.map((ct,i)=>(
-                  <div key={i} style={{display:"flex",gap:9,marginBottom:7,alignItems:"center",padding:"4px 7px",borderRadius:8,background:ct.courseColor+"0e",border:`1px solid ${ct.courseColor}22`}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:ct.courseColor,flexShrink:0}}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ct.title}</div>
-                      <div style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>W{ct.weekNum}</div>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </Card>
-          <Card P={P} noHover style={{flex:1,padding:16}}>
-            <div style={{fontSize:14,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:8}}>Week Notes</div>
-            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="jot it down..." style={{width:"100%",minHeight:120,background:"transparent",border:"none",outline:"none",fontFamily:"'Caveat',cursive",fontSize:16,color:P.ink,resize:"none",lineHeight:1.8,padding:0}}/>
-          </Card>
-        </div>
-      )}
-      {mobile&&weekTasks.length>0&&(
-        <Card P={P} noHover style={{padding:14,marginTop:12}}>
-          <div style={{fontSize:13,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:10}}>This Week's Tasks</div>
-          {weekTasks.map(t=>(
-            <div key={t.id} style={{display:"flex",gap:9,marginBottom:8,alignItems:"center"}} onClick={()=>onTaskEdit(t)}>
-              <Check checked={t.done} onChange={()=>onTaskToggle(t.id)} color={t.urgent?P.accent:P.navy} P={P}/>
-              <span style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,flex:1,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
-            </div>
-          ))}
-        </Card>
-      )}
+          <div style={{flex:1,padding:mobile?"8px 10px":"10px 12px",display:"flex",flexDirection:"column",gap:3,minHeight:mobile?58:66}}>
+            {evs.length===0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",opacity:0.3,alignSelf:"center",marginTop:6}}>—</div>}
+            {evs.map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId),col=cal?cal.color:P.accent;const ts=ev.startTime&&ev.endTime?fmtT(ev.startTime)+"–"+fmtT(ev.endTime):ev.startTime?fmtT(ev.startTime):"";return <div key={ev.id} onClick={()=>onEvClick(ev)} style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",padding:"4px 8px",borderRadius:7,background:col+"14",transition:"background 0.12s"}} onMouseEnter={e=>e.currentTarget.style.background=col+"28"} onMouseLeave={e=>e.currentTarget.style.background=col+"14"}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:ev.done?P.ink3:col,flexShrink:0}}/>
+              {ev.recurring&&<span style={{fontSize:10,color:P.ink3}}>↻</span>}
+              {ts&&<span style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif",minWidth:mobile?0:72}}>{ts}</span>}
+              <span style={{fontSize:mobile?12:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",flex:1,fontWeight:500,textDecoration:ev.done?"line-through":"none"}}>{ev.title}</span>
+            </div>;})}
+            <button onClick={()=>onAddEv(day.ds)} style={{alignSelf:"flex-start",background:P.bg2,border:"1px solid "+P.border2,borderRadius:6,cursor:"pointer",color:P.ink2,padding:"2px 9px",fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:500,transition:"all 0.12s"}}
+              onMouseEnter={e=>{e.currentTarget.style.background=P.al;e.currentTarget.style.color=P.accent;e.currentTarget.style.borderColor=P.am;}}
+              onMouseLeave={e=>{e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink2;e.currentTarget.style.borderColor=P.border2;}}>+ add</button>
+          </div>
+        </div>;
+      })}
     </div>
-  );
+    {!mobile&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <Card P={P} style={{padding:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={{fontSize:14,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>This Week</div>
+          <Btn onClick={onAddTask} small P={P}>+ Task</Btn>
+        </div>
+        {wkCourseTasks.length>0&&<>
+          <div style={{fontSize:10,fontWeight:600,color:P.ink3,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>From Courses</div>
+          {wkCourseTasks.map(ct=><div key={ct.id} style={{display:"flex",gap:8,marginBottom:6,padding:"5px 8px",borderRadius:8,background:ct.cc+"10",borderLeft:"3px solid "+(ct.cc||P.accent)}}>
+            <div style={{flex:1}}><div style={{fontSize:12,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ct.title}</div><div style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{ct.notes}</div></div>
+            {ct.urgent&&<Pill color={P.accent} bg={P.al} style={{fontSize:9,alignSelf:"center"}}>!</Pill>}
+          </div>)}
+          <div style={{height:1,background:P.border,margin:"8px 0"}}/>
+        </>}
+        {wkTasks.length===0&&wkCourseTasks.length===0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing due this week</div>}
+        {wkTasks.map(t=>{const cd=countdown(t.dueDate);return <div key={t.id} style={{display:"flex",gap:8,marginBottom:8,alignItems:"flex-start",cursor:"pointer",padding:"4px 6px",borderRadius:7,transition:"background 0.12s"}} onClick={()=>onTaskEdit(t)} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <Check checked={t.done} onChange={()=>onTaskToggle(t.id)} color={t.urgent?P.accent:P.navy} P={P}/>
+          <div style={{flex:1}}>{t.urgent&&<Pill color={P.accent} bg={P.al} style={{marginBottom:2,fontSize:10}}>urgent</Pill>}<div style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>{cd&&<div style={{fontSize:10,color:cd.c,fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>{cd.label}</div>}</div>
+        </div>;})}
+      </Card>
+      <Card P={P} style={{flex:1,padding:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:8}}>Notes</div>
+        <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="jot it down…" style={{width:"100%",minHeight:110,background:"transparent",border:"none",outline:"none",fontFamily:"'Caveat',cursive",fontSize:16,color:P.ink,resize:"none",lineHeight:1.8,padding:0}}/>
+      </Card>
+    </div>}
+    {mobile&&(wkTasks.length>0||wkCourseTasks.length>0)&&<Card P={P} style={{padding:12}}>
+      <div style={{fontSize:13,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:8}}>This Week</div>
+      {wkCourseTasks.slice(0,4).map(ct=><div key={ct.id} style={{display:"flex",gap:8,marginBottom:6,alignItems:"center",padding:"4px 6px",borderRadius:6,background:ct.cc+"10",borderLeft:"2px solid "+(ct.cc||P.accent)}}>
+        <span style={{fontSize:12,color:P.ink,fontFamily:"'DM Sans',sans-serif",flex:1}}>{ct.title}</span>
+      </div>)}
+      {wkTasks.map(t=><div key={t.id} style={{display:"flex",gap:8,marginBottom:6,alignItems:"center"}} onClick={()=>onTaskEdit(t)}>
+        <Check checked={t.done} onChange={()=>onTaskToggle(t.id)} color={t.urgent?P.accent:P.navy} P={P}/>
+        <span style={{fontSize:13,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,flex:1,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
+      </div>)}
+    </Card>}
+  </div>;
 }
 
-// ─── Tasks View ───────────────────────────────────────────────────────────────
+// ── Tasks View ────────────────────────────────────────────────────────────────
 function TasksView({tasks,setTasks,P,mobile}){
-  const[lists,setLists]=useState(()=>lsGet("taskLists8",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]));
-  const[active,setActive]=useState("list1");
-  const[showModal,setShowModal]=useState(false);
-  const[editTask,setEditTask]=useState(null);
-  const[newList,setNewList]=useState("");const[addingList,setAddingList]=useState(false);
-  useEffect(()=>{lsSave("taskLists8",lists);},[lists]);
-  const listTasks=tasks.filter(t=>t.listId===active&&!t.isCourseTask).sort((a,b)=>{if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;if(a.done&&!b.done)return 1;if(!a.done&&b.done)return -1;return(a.dueDate||"").localeCompare(b.dueDate||"");});
-  function saveTask(f){setTasks(p=>{const e=p.find(t=>t.id===f.id);return e?p.map(t=>t.id===f.id?f:t):[...p,f];});setShowModal(false);setEditTask(null);}
-  function delTask(id){setTasks(p=>p.filter(t=>t.id!==id));setShowModal(false);setEditTask(null);}
-  function addList(){if(!newList.trim())return;const nl={id:Date.now().toString(),name:newList.trim()};setLists(p=>[...p,nl]);setActive(nl.id);setNewList("");setAddingList(false);}
+  const[lists,setLists]=useState(()=>lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]));
+  const[active,setActive]=useState(()=>{const s=lsGet("tlists9",[{id:"list1"}]);return s[0]?.id||"list1";});
+  const[modal,setModal]=useState(null);
+  const[newL,setNewL]=useState("");const[addL,setAddL]=useState(false);
+  useEffect(()=>{lsSet("tlists9",lists);},[lists]);
+  const lt=tasks.filter(t=>t.listId===active).sort((a,b)=>{if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;if(a.done&&!b.done)return 1;if(!a.done&&b.done)return -1;return(a.dueDate||"").localeCompare(b.dueDate||"");});
+  function saveTask(f){setTasks(p=>{const e=p.find(t=>t.id===f.id);return e?p.map(t=>t.id===f.id?f:t):[...p,f];});setModal(null);}
+  function delTask(id){setTasks(p=>p.filter(t=>t.id!==id));setModal(null);}
+  function doAddList(){if(!newL.trim())return;const nl={id:Date.now()+"",name:newL.trim()};setLists(p=>[...p,nl]);setActive(nl.id);setNewL("");setAddL(false);}
   function delList(id){if(lists.length<=1)return;setLists(p=>p.filter(l=>l.id!==id));setTasks(p=>p.filter(t=>t.listId!==id));if(active===id)setActive(lists.find(l=>l.id!==id)?.id||"");}
-  const SidebarLists = () => (
-    <>
-      <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>Lists</div>
-      {lists.map((l)=>(
-        <div key={l.id} style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-          <button onClick={()=>setActive(l.id)} style={{flex:1,textAlign:"left",background:active===l.id?P.accentLight:"transparent",color:active===l.id?P.accent:P.ink2,border:`1.5px solid ${active===l.id?P.accentMid:"transparent"}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s"}}>{l.name}</button>
+  return <div style={{display:mobile?"block":"grid",gridTemplateColumns:"196px 1fr",gap:20,animation:"slideUp 0.3s ease both"}}>
+    <div style={{marginBottom:mobile?14:0}}>
+      {mobile?<div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+        {lists.map(l=><button key={l.id} onClick={()=>setActive(l.id)} style={{flexShrink:0,background:active===l.id?P.accent:"transparent",color:active===l.id?"#fff":P.ink2,border:"1.5px solid "+(active===l.id?P.accent:P.border2),borderRadius:20,padding:"5px 15px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,whiteSpace:"nowrap"}}>{l.name}</button>)}
+        <button onClick={()=>setAddL(true)} style={{flexShrink:0,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:20,padding:"5px 13px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3}}>+ list</button>
+      </div>:<>
+        <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>Lists</div>
+        {lists.map(l=><div key={l.id} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+          <button onClick={()=>setActive(l.id)} style={{flex:1,textAlign:"left",background:active===l.id?P.al:"transparent",color:active===l.id?P.accent:P.ink2,border:"1.5px solid "+(active===l.id?P.am:"transparent"),borderRadius:9,padding:"7px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s"}}>{l.name}</button>
           {lists.length>1&&<button onClick={()=>delList(l.id)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.color=P.accent} onMouseLeave={e=>e.currentTarget.style.color=P.ink3}>✕</button>}
-        </div>
-      ))}
-      {addingList?<div style={{display:"flex",gap:5,marginTop:5}}><Inp autoFocus value={newList} onChange={e=>setNewList(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name..." style={{flex:1,fontSize:12}} P={P}/><Btn onClick={addList} small P={P}>+</Btn></div>
-      :<button onClick={()=>setAddingList(true)} style={{width:"100%",marginTop:5,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ new list</button>}
-    </>
-  );
-  return(
-    <div style={{display:mobile?"block":"grid",gridTemplateColumns:"200px 1fr",gap:22,animation:"slideUp 0.3s ease both"}}>
-      {mobile?(
-        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:8}}>
-          {lists.map(l=><button key={l.id} onClick={()=>setActive(l.id)} style={{flexShrink:0,background:active===l.id?P.accent:"transparent",color:active===l.id?"#fff":P.ink2,border:`1.5px solid ${active===l.id?P.accent:P.border2}`,borderRadius:20,padding:"6px 16px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s",whiteSpace:"nowrap"}}>{l.name}</button>)}
-          <button onClick={()=>setAddingList(true)} style={{flexShrink:0,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:20,padding:"6px 14px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3}}>+</button>
-        </div>
-      ):<SidebarLists/>}
-      {mobile&&addingList&&<div style={{display:"flex",gap:6,marginBottom:10}}><Inp autoFocus value={newList} onChange={e=>setNewList(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name..." style={{flex:1,fontSize:12}} P={P}/><Btn onClick={addList} small P={P}>+</Btn></div>}
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div style={{fontSize:mobile?18:22,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{lists.find(l=>l.id===active)?.name}</div>
-          <Btn onClick={()=>{setEditTask(null);setShowModal(true);}} P={P} small={mobile}>+ New Task</Btn>
-        </div>
-        {listTasks.length===0&&<Card P={P} noHover style={{textAlign:"center",padding:40,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing here yet.</Card>}
-        {listTasks.map((t,i)=>{const cd=fmtCountdown(t.dueDate);return(
-          <Card key={t.id} P={P} onClick={()=>{setEditTask(t);setShowModal(true);}} style={{marginBottom:7,padding:"12px 16px",borderLeft:`4px solid ${t.urgent?P.accent:P.border}`,animation:`slideUp 0.25s ease ${i*20}ms both`,opacity:t.done?0.5:1}}>
-            <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-              <Check checked={t.done} onChange={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:!x.done}:x))} color={t.urgent?P.accent:P.navy} P={P}/>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:t.notes||t.dueDate?3:0}}>
-                  {t.urgent&&<Pill color={P.accent} bg={P.accentLight} style={{fontSize:10}}>urgent</Pill>}
-                  <span style={{fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
-                </div>
-                {t.notes&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>{t.notes}</div>}
-                <div style={{display:"flex",gap:7,alignItems:"center",marginTop:t.dueDate?3:0,flexWrap:"wrap"}}>
-                  {(t.dueDate||t.dueTime)&&<div style={{fontSize:11,color:P.accent,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>Due: {t.dueDate}{t.dueTime?` ${fmtT(t.dueTime)}`:""}</div>}
-                  {cd&&<Pill color={cd.color} style={{fontSize:10}}>{cd.label}</Pill>}
-                </div>
-              </div>
+        </div>)}
+        {addL?<div style={{display:"flex",gap:4,marginTop:5}}><Inp autoFocus value={newL} onChange={e=>setNewL(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doAddList()} placeholder="List name…" P={P} style={{flex:1,fontSize:12}}/><Btn onClick={doAddList} small P={P}>+</Btn></div>
+        :<button onClick={()=>setAddL(true)} style={{width:"100%",marginTop:5,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:9,padding:"7px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ new list</button>}
+      </>}
+      {addL&&mobile&&<div style={{display:"flex",gap:6,marginTop:8}}><Inp autoFocus value={newL} onChange={e=>setNewL(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doAddList()} placeholder="List name…" P={P} style={{flex:1,fontSize:12}}/><Btn onClick={doAddList} small P={P}>+</Btn><button onClick={()=>setAddL(false)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:16}}>✕</button></div>}
+    </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:mobile?17:21,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{lists.find(l=>l.id===active)?.name||""}</div>
+        <Btn onClick={()=>setModal({new:true})} P={P} small={mobile}>+ New Task</Btn>
+      </div>
+      {lt.length===0&&<Card P={P} style={{textAlign:"center",padding:38,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing here yet.</Card>}
+      {lt.map((t,i)=>{const cd=countdown(t.dueDate);return <Card key={t.id} P={P} onClick={()=>setModal(t)} style={{marginBottom:6,padding:"11px 15px",borderLeft:"4px solid "+(t.urgent?P.accent:P.border),animation:"slideUp 0.25s ease "+(i*18)+"ms both",opacity:t.done?0.5:1}}>
+        <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+          <Check checked={t.done} onChange={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:!x.done}:x))} color={t.urgent?P.accent:P.navy} P={P}/>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:t.notes||t.dueDate?3:0}}>
+              {t.urgent&&<Pill color={P.accent} bg={P.al} style={{fontSize:10}}>urgent</Pill>}
+              <span style={{fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</span>
             </div>
-          </Card>
-        );})}
-      </div>
-      {showModal&&<TaskModal task={editTask} lists={lists} onSave={saveTask} onDelete={delTask} onClose={()=>{setShowModal(false);setEditTask(null);}} P={P} mobile={mobile}/>}
+            {t.notes&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>{t.notes}</div>}
+            {t.links&&t.links.trim()&&t.links.split("\n").filter(Boolean).map((l,i)=><a key={i} href={l} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} style={{display:"block",fontSize:11,color:P.navy,fontFamily:"monospace",wordBreak:"break-all"}}>{l}</a>)}
+            <div style={{display:"flex",gap:7,alignItems:"center",marginTop:t.dueDate?3:0}}>
+              {t.dueDate&&<div style={{fontSize:11,color:P.accent,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>Due: {t.dueDate}{t.dueTime?" "+fmtT(t.dueTime):""}</div>}
+              {cd&&<Pill color={cd.c} style={{fontSize:10}}>{cd.label}</Pill>}
+            </div>
+          </div>
+        </div>
+      </Card>;})}
     </div>
-  );
+    {modal&&<TaskModal task={modal.new?null:modal} lists={lists} onSave={saveTask} onDel={delTask} onClose={()=>setModal(null)} P={P} mobile={mobile}/>}
+  </div>;
 }
 
-// ─── Simple Lists ─────────────────────────────────────────────────────────────
-function SimpleListsView({simpleLists,setSimpleLists,P,mobile}){
-  const[active,setActive]=useState(()=>simpleLists[0]?.id||null);
-  const[newItemText,setNewItemText]=useState("");
-  const[newListName,setNewListName]=useState("");const[addingList,setAddingList]=useState(false);
-  const al=simpleLists.find(l=>l.id===active);
-  function addItem(){if(!newItemText.trim()||!active)return;setSimpleLists(p=>p.map(l=>l.id===active?{...l,items:[...l.items,{id:Date.now().toString(),text:newItemText.trim(),done:false}]}:l));setNewItemText("");}
-  function toggleItem(lid,iid){setSimpleLists(p=>p.map(l=>l.id===lid?{...l,items:l.items.map(it=>it.id===iid?{...it,done:!it.done}:it)}:l));}
-  function delItem(lid,iid){setSimpleLists(p=>p.map(l=>l.id===lid?{...l,items:l.items.filter(it=>it.id!==iid)}:l));}
-  function addList(){if(!newListName.trim())return;const nl={id:Date.now().toString(),name:newListName.trim(),items:[]};setSimpleLists(p=>[...p,nl]);setActive(nl.id);setNewListName("");setAddingList(false);}
-  function delList(id){setSimpleLists(p=>p.filter(l=>l.id!==id));if(active===id)setActive(simpleLists.find(l=>l.id!==id)?.id||null);}
-  const done=al?.items.filter(i=>i.done).length||0;const total=al?.items.length||0;const pct=total?Math.round(done/total*100):0;
-  return(
-    <div style={{display:mobile?"block":"grid",gridTemplateColumns:"200px 1fr",gap:22,animation:"slideUp 0.3s ease both"}}>
-      <div style={{marginBottom:mobile?14:0}}>
-        {mobile?(
-          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6}}>
-            {simpleLists.map(l=><button key={l.id} onClick={()=>setActive(l.id)} style={{flexShrink:0,background:active===l.id?P.accent:"transparent",color:active===l.id?"#fff":P.ink2,border:`1.5px solid ${active===l.id?P.accent:P.border2}`,borderRadius:20,padding:"6px 16px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s",whiteSpace:"nowrap"}}>{l.name}</button>)}
-            <button onClick={()=>setAddingList(true)} style={{flexShrink:0,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:20,padding:"6px 14px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3}}>+</button>
-          </div>
-        ):(
-          <>
-            <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>My Lists</div>
-            {simpleLists.map(l=>(
-              <div key={l.id} style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                <button onClick={()=>setActive(l.id)} style={{flex:1,textAlign:"left",background:active===l.id?P.accentLight:"transparent",color:active===l.id?P.accent:P.ink2,border:`1.5px solid ${active===l.id?P.accentMid:"transparent"}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span>{l.name}</span>
-                  {l.items.length>0&&<span style={{fontSize:10,color:active===l.id?P.accent:P.ink3}}>{Math.round(l.items.filter(x=>x.done).length/l.items.length*100)}%</span>}
-                </button>
-                <button onClick={()=>delList(l.id)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.color=P.accent} onMouseLeave={e=>e.currentTarget.style.color=P.ink3}>✕</button>
-              </div>
-            ))}
-            {addingList?<div style={{display:"flex",gap:5,marginTop:5}}><Inp autoFocus value={newListName} onChange={e=>setNewListName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name..." style={{flex:1,fontSize:12}} P={P}/><Btn onClick={addList} small P={P}>+</Btn></div>
-            :<button onClick={()=>setAddingList(true)} style={{width:"100%",marginTop:5,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ new list</button>}
-          </>
-        )}
-        {addingList&&mobile&&<div style={{display:"flex",gap:6,marginTop:8}}><Inp autoFocus value={newListName} onChange={e=>setNewListName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name..." style={{flex:1,fontSize:12}} P={P}/><Btn onClick={addList} small P={P}>+</Btn></div>}
-      </div>
-      <div>
-        {!al&&<Card P={P} noHover style={{textAlign:"center",padding:40,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Create a list to get started.</Card>}
-        {al&&(<>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:mobile?18:22,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{al.name}</div>
-            {total>0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{done}/{total}</div>}
-          </div>
-          {total>0&&<ProgBar pct={pct} color={P.accent} P={P} style={{marginBottom:14}}/>}
-          {al.items.map((it,i)=>(
-            <Card key={it.id} P={P} noHover style={{marginBottom:6,padding:"11px 14px",borderLeft:`3px solid ${it.done?P.border:P.navy}`,opacity:it.done?0.55:1}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <Check checked={it.done} onChange={()=>toggleItem(al.id,it.id)} color={P.navy} P={P}/>
-                <span style={{flex:1,fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",textDecoration:it.done?"line-through":"none",fontWeight:500}}>{it.text}</span>
-                <button onClick={()=>delItem(al.id,it.id)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13,flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.color=P.accent} onMouseLeave={e=>e.currentTarget.style.color=P.ink3}>✕</button>
-              </div>
-            </Card>
-          ))}
-          <div style={{display:"flex",gap:8,marginTop:12}}>
-            <Inp value={newItemText} onChange={e=>setNewItemText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder={`Add to ${al.name}…`} P={P}/>
-            <Btn onClick={addItem} P={P} small={mobile}>Add</Btn>
-          </div>
-        </>)}
-      </div>
+// ── Simple Lists ──────────────────────────────────────────────────────────────
+function ListsView({lists,setLists,P,mobile}){
+  const[active,setActive]=useState(()=>lsGet("slists9",[{id:"sl1"}])[0]?.id||null);
+  const[newItem,setNewItem]=useState("");
+  const[newName,setNewName]=useState("");const[addL,setAddL]=useState(false);
+  useEffect(()=>{lsSet("slists9",lists);},[lists]);
+  const al=lists.find(l=>l.id===active)||null;
+  function addItem(){if(!newItem.trim()||!active)return;setLists(p=>p.map(l=>l.id===active?{...l,items:[...l.items,{id:Date.now()+"",text:newItem.trim(),done:false}]}:l));setNewItem("");}
+  function toggle(lid,iid){setLists(p=>p.map(l=>l.id===lid?{...l,items:l.items.map(it=>it.id===iid?{...it,done:!it.done}:it)}:l));}
+  function del(lid,iid){setLists(p=>p.map(l=>l.id===lid?{...l,items:l.items.filter(it=>it.id!==iid)}:l));}
+  function addList(){if(!newName.trim())return;const nl={id:Date.now()+"",name:newName.trim(),items:[]};setLists(p=>[...p,nl]);setActive(nl.id);setNewName("");setAddL(false);}
+  function delList(id){setLists(p=>p.filter(l=>l.id!==id));if(active===id)setActive(lists.find(l=>l.id!==id)?.id||null);}
+  const done=al?al.items.filter(i=>i.done).length:0;
+  const tot=al?al.items.length:0;
+  return <div style={{display:mobile?"block":"grid",gridTemplateColumns:"196px 1fr",gap:20,animation:"slideUp 0.3s ease both"}}>
+    <div style={{marginBottom:mobile?14:0}}>
+      {mobile?<div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
+        {lists.map(l=><button key={l.id} onClick={()=>setActive(l.id)} style={{flexShrink:0,background:active===l.id?P.accent:"transparent",color:active===l.id?"#fff":P.ink2,border:"1.5px solid "+(active===l.id?P.accent:P.border2),borderRadius:20,padding:"5px 15px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,whiteSpace:"nowrap"}}>{l.name}</button>)}
+        <button onClick={()=>setAddL(true)} style={{flexShrink:0,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:20,padding:"5px 13px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3}}>+ list</button>
+      </div>:<>
+        <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>My Lists</div>
+        {lists.map(l=><div key={l.id} style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}>
+          <button onClick={()=>setActive(l.id)} style={{flex:1,textAlign:"left",background:active===l.id?P.al:"transparent",color:active===l.id?P.accent:P.ink2,border:"1.5px solid "+(active===l.id?P.am:"transparent"),borderRadius:9,padding:"7px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active===l.id?600:400,transition:"all 0.15s",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span>{l.name}</span>
+            {l.items.length>0&&<span style={{fontSize:10,color:active===l.id?P.accent:P.ink3}}>{Math.round(l.items.filter(x=>x.done).length/l.items.length*100)}%</span>}
+          </button>
+          <button onClick={()=>delList(l.id)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.color=P.accent} onMouseLeave={e=>e.currentTarget.style.color=P.ink3}>✕</button>
+        </div>)}
+        {addL?<div style={{display:"flex",gap:4,marginTop:5}}><Inp autoFocus value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name…" P={P} style={{flex:1,fontSize:12}}/><Btn onClick={addList} small P={P}>+</Btn></div>
+        :<button onClick={()=>setAddL(true)} style={{width:"100%",marginTop:5,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:9,padding:"7px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ new list</button>}
+      </>}
+      {addL&&mobile&&<div style={{display:"flex",gap:6,marginTop:8}}><Inp autoFocus value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addList()} placeholder="List name…" P={P} style={{flex:1,fontSize:12}}/><Btn onClick={addList} small P={P}>+</Btn><button onClick={()=>setAddL(false)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:16}}>✕</button></div>}
     </div>
-  );
+    <div>
+      {!al&&<Card P={P} style={{textAlign:"center",padding:38,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Create a list to get started.</Card>}
+      {al&&<>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <div style={{fontSize:mobile?17:21,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{al.name}</div>
+          {tot>0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{done}/{tot} done</div>}
+        </div>
+        {tot>0&&<Bar pct={Math.round(done/tot*100)} color={P.accent} P={P} style={{marginBottom:14}}/>}
+        {al.items.map((it,i)=><Card key={it.id} P={P} style={{marginBottom:5,padding:"10px 13px",borderLeft:"3px solid "+(it.done?P.border:P.navy),opacity:it.done?0.55:1,animation:"slideUp 0.2s ease "+(i*18)+"ms both"}}>
+          <div style={{display:"flex",alignItems:"center",gap:9}}>
+            <Check checked={it.done} onChange={()=>toggle(al.id,it.id)} color={P.navy} P={P}/>
+            <span style={{flex:1,fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",textDecoration:it.done?"line-through":"none",fontWeight:500}}>{it.text}</span>
+            <button onClick={()=>del(al.id,it.id)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.color=P.accent} onMouseLeave={e=>e.currentTarget.style.color=P.ink3}>✕</button>
+          </div>
+        </Card>)}
+        <div style={{display:"flex",gap:8,marginTop:10}}>
+          <Inp value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder={"Add to "+al.name+"…"} P={P}/>
+          <Btn onClick={addItem} P={P} small={mobile}>Add</Btn>
+        </div>
+      </>}
+    </div>
+  </div>;
 }
 
-// ─── Course Tracker ───────────────────────────────────────────────────────────
-function CourseTracker({P,mobile,tasks,setTasks}){
-  const[courses,setCourses]=useState(()=>lsGet("courses8",DEF_COURSES));
-  const[checks,setChecks]=useState(()=>lsGet("courseChecks8",{}));
-  const[cNotes,setCNotes]=useState(()=>lsGet("courseNotes8",{}));
+// ── Courses ───────────────────────────────────────────────────────────────────
+function CoursesView({P,mobile}){
+  const[courses,setCourses]=useState(()=>lsGet("courses9",[]));
+  const[checks,setChecks]=useState(()=>lsGet("checks9",{}));
+  const[notes,setNotes]=useState(()=>lsGet("cnotes9",{}));
   const[view,setView]=useState("course");
   const[activeWk,setActiveWk]=useState(CW);
-  const[activeCourse,setActiveCourse]=useState(()=>lsGet("courses8",DEF_COURSES)[0]?.id||"");
-  const[addingCourse,setAddingCourse]=useState(false);
-  const[newCourse,setNewCourse]=useState({code:"",name:"",color:P.accent,columns:["Watched Lecture","Done Readings"]});
-  const[editCourse,setEditCourse]=useState(null);
-  const[addingColFor,setAddingColFor]=useState(null);
-  const[newColText,setNewColText]=useState("");
-  const CCOLS=[P.accent,P.navy,"#3a7a5a","#7a4a6a","#7a6a1a","#1a6a7a","#c9a84c","#7a3a1a"];
-  useEffect(()=>{lsSave("courses8",courses);},[courses]);
-  useEffect(()=>{lsSave("courseChecks8",checks);},[checks]);
-  useEffect(()=>{lsSave("courseNotes8",cNotes);},[cNotes]);
-
-  function tog(wk,cid,col){
-    const k=`${wk}|${cid}|${col}`;
-    setChecks(p=>({...p,[k]:!p[k]}));
-  }
-  function getN(wk,cid){return cNotes[`${wk}|${cid}`]||"";}
-  function setN(wk,cid,v){setCNotes(p=>({...p,[`${wk}|${cid}`]:v}));}
-  function addCol(cid){if(!newColText.trim())return;setCourses(p=>p.map(c=>c.id===cid?{...c,columns:[...c.columns,newColText.trim()]}:c));setNewColText("");setAddingColFor(null);}
+  const[activeC,setActiveC]=useState(()=>{const c=lsGet("courses9",[]);return c[0]?.id||"";});
+  const[addingC,setAddingC]=useState(false);
+  const[newC,setNewC]=useState({code:"",name:"",color:"#c13b2e",columns:["Watched Lecture","Done Readings"]});
+  const[editC,setEditC]=useState(null);
+  const[addColFor,setAddColFor]=useState(null);
+  const[newCol,setNewCol]=useState("");
+  const CCOLS=["#c13b2e","#1c2f5e","#2e7d4e","#7a4a6a","#c9853a","#1a6a7a","#c9a84c","#7a3a1a"];
+  useEffect(()=>{lsSet("courses9",courses);},[courses]);
+  useEffect(()=>{lsSet("checks9",checks);},[checks]);
+  useEffect(()=>{lsSet("cnotes9",notes);},[notes]);
+  const wks=Array.from({length:TW},(_,i)=>i+1);
+  const ac=courses.find(c=>c.id===activeC)||courses[0]||null;
+  function tog(w,cid,col){const k=w+"|"+cid+"|"+col;setChecks(p=>({...p,[k]:!p[k]}));}
+  function getN(w,cid){return notes[w+"|"+cid]||"";}
+  function setN(w,cid,v){setNotes(p=>({...p,[w+"|"+cid]:v}));}
+  function cPct(c){let t=0,d=0;wks.forEach(w=>{c.columns.forEach(col=>{t++;if(checks[w+"|"+c.id+"|"+col])d++;});});return t?Math.round(d/t*100):0;}
+  function wPct(w){let t=0,d=0;courses.forEach(c=>{c.columns.forEach(col=>{t++;if(checks[w+"|"+c.id+"|"+col])d++;});});return t?Math.round(d/t*100):0;}
+  function addColTo(cid){if(!newCol.trim())return;setCourses(p=>p.map(c=>c.id===cid?{...c,columns:[...c.columns,newCol.trim()]}:c));setNewCol("");setAddColFor(null);}
   function remCol(cid,col){setCourses(p=>p.map(c=>c.id===cid?{...c,columns:c.columns.filter(x=>x!==col)}:c));}
-  function saveCourse(){if(editCourse){setCourses(p=>p.map(c=>c.id===editCourse.id?editCourse:c));setEditCourse(null);}else if(newCourse.code.trim()){setCourses(p=>[...p,{...newCourse,id:Date.now().toString()}]);setNewCourse({code:"",name:"",color:P.accent,columns:["Watched Lecture","Done Readings"]});setAddingCourse(false);}}
-  const weeks=Array.from({length:TW},(_,i)=>i+1);
-  const acd=courses.find(c=>c.id===activeCourse)||courses[0]||null;
-  function cPct(c){let t=0,d=0;weeks.forEach(w=>{c.columns.forEach(col=>{t++;if(checks[`${w}|${c.id}|${col}`])d++;});});return t?Math.round(d/t*100):0;}
-  function wPct(wk){let t=0,d=0;courses.forEach(c=>{c.columns.forEach(col=>{t++;if(checks[`${wk}|${c.id}|${col}`])d++;});});return t?Math.round(d/t*100):0;}
+  function saveC(){
+    if(editC){setCourses(p=>p.map(c=>c.id===editC.id?editC:c));setEditC(null);}
+    else if(newC.code.trim()){const nc={...newC,id:Date.now()+""};setCourses(p=>[...p,nc]);setActiveC(nc.id);setNewC({code:"",name:"",color:"#c13b2e",columns:["Watched Lecture","Done Readings"]});setAddingC(false);}
+  }
+  function delC(id){setCourses(p=>p.filter(c=>c.id!==id));setEditC(null);if(activeC===id)setActiveC(courses.find(c=>c.id!==id)?.id||"");}
 
-  // (course items are shown in week panel only, not in tasks array)
-
-  const OV2=mkOV(mobile);const MB2=mkMB(P,mobile);
-
-  const ColToggleRow=({c,wk})=>(
-    <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
-      {c.columns.map(col=>{const k=`${wk}|${c.id}|${col}`,done=checks[k];return(
-        <div key={col} onClick={()=>tog(wk,c.id,col)} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"5px 11px",borderRadius:20,background:done?c.color+"18":P.bg2,border:`1.5px solid ${done?c.color:P.border}`,transition:"all 0.15s"}}>
-          <Check checked={!!done} onChange={()=>tog(wk,c.id,col)} color={c.color} P={P}/>
-          <span style={{fontSize:mobile?11:12,color:done?c.color:P.ink2,fontFamily:"'DM Sans',sans-serif",fontWeight:done?600:400}}>{col}</span>
-        </div>
-      );})}
-      {addingColFor===c.id?<div style={{display:"flex",gap:5,alignItems:"center"}}><Inp value={newColText} onChange={e=>setNewColText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCol(c.id)} placeholder="Column…" style={{fontSize:11,width:120,padding:"5px 9px"}} P={P}/><Btn onClick={()=>addCol(c.id)} small P={P}>+</Btn><button onClick={()=>{setAddingColFor(null);setNewColText("");}} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}}>✕</button></div>
-      :<button onClick={()=>setAddingColFor(c.id)} style={{background:"none",border:`1.5px dashed ${P.border2}`,borderRadius:20,padding:"4px 10px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",transition:"all 0.12s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=c.color} onMouseLeave={e=>e.currentTarget.style.borderColor=P.border2}>+ col</button>}
+  return <div style={{animation:"slideUp 0.3s ease both"}}>
+    <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+      {["week","course"].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?P.accent:"transparent",color:view===v?"#fff":P.ink2,border:"1.5px solid "+(view===v?P.accent:P.border2),borderRadius:20,padding:"5px 16px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:600,transition:"all 0.15s"}}>{v==="week"?"By Week":"By Course"}</button>)}
     </div>
-  );
 
-  return(
-    <div style={{animation:"slideUp 0.3s ease both"}}>
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {["week","course"].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?P.accent:"transparent",color:view===v?"#fff":P.ink2,border:`1.5px solid ${view===v?P.accent:P.border2}`,borderRadius:20,padding:mobile?"5px 14px":"6px 18px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:mobile?12:13,fontWeight:600,transition:"all 0.15s"}}>{v==="week"?"By Week":"By Course"}</button>)}
+    {view==="week"&&<div style={{display:mobile?"block":"grid",gridTemplateColumns:"175px 1fr",gap:18}}>
+      <div style={{marginBottom:mobile?12:0}}>
+        {mobile?<div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4}}>
+          {wks.map(w=><button key={w} onClick={()=>setActiveWk(w)} style={{flexShrink:0,background:w===activeWk?P.accent:w===CW?P.al:"transparent",color:w===activeWk?"#fff":w===CW?P.accent:P.ink3,border:"1.5px solid "+(w===activeWk?P.accent:w===CW?P.am:P.border),borderRadius:20,padding:"4px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:w===CW?600:400}}>{w===CW?"W"+w+" ←":"W"+w}</button>)}
+        </div>:<>
+          <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>Term Weeks</div>
+          {wks.map(w=><button key={w} onClick={()=>setActiveWk(w)} style={{width:"100%",textAlign:"left",background:w===activeWk?P.al:"transparent",color:w===activeWk?P.accent:w===CW?P.accent:P.ink2,border:"1.5px solid "+(w===activeWk?P.am:w===CW?P.am+"66":"transparent"),borderRadius:9,padding:"6px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:w===activeWk?700:w===CW?600:400,transition:"all 0.15s",marginBottom:2,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div>Week {w}{w===CW&&<span style={{fontSize:9,marginLeft:4,opacity:0.6}}> ← now</span>}</div><div style={{fontSize:10,color:w===activeWk?P.accent:P.ink3,fontWeight:400}}>{wkLabel(w)}</div></div>
+            <span style={{fontSize:10,color:w===activeWk?P.accent:P.ink3}}>{wPct(w)}%</span>
+          </button>)}
+        </>}
       </div>
-
-      {view==="week"&&(
-        <div style={{display:mobile?"block":"grid",gridTemplateColumns:"180px 1fr",gap:18}}>
-          <div style={{marginBottom:mobile?12:0}}>
-            {mobile?(<div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4}}>
-              {weeks.map(w=><button key={w} onClick={()=>setActiveWk(w)} style={{flexShrink:0,background:w===activeWk?P.accent:w===CW?P.accentLight:"transparent",color:w===activeWk?"#fff":w===CW?P.accent:P.ink3,border:`1.5px solid ${w===activeWk?P.accent:w===CW?P.accentMid:P.border}`,borderRadius:20,padding:"4px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:w===CW?600:400}}>W{w}</button>)}
-            </div>):(
-              <>
-                <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>Term Weeks</div>
-                {weeks.map(w=>{const isCur=w===CW,isSel=w===activeWk,pct=wPct(w);return(
-                  <button key={w} onClick={()=>setActiveWk(w)} style={{width:"100%",textAlign:"left",background:isSel?P.accentLight:"transparent",color:isSel?P.accent:isCur?P.accent:P.ink2,border:`1.5px solid ${isSel?P.accentMid:isCur?P.accentMid+"66":"transparent"}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isSel?700:isCur?600:400,transition:"all 0.15s",marginBottom:2,display:"flex",flexDirection:"column",gap:2}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span>Week {w}{isCur?<span style={{fontSize:9,marginLeft:4,opacity:0.7}}>← now</span>:null}</span>
-                      <span style={{fontSize:10,color:isSel?P.accent:P.ink3}}>{pct}%</span>
-                    </div>
-                    <div style={{fontSize:9,color:isSel?P.accent:P.ink3,fontWeight:400}}>{fmtTermWeek(w)}</div>
-                  </button>
-                );})}
-              </>
-            )}
-          </div>
-          <div style={{overflowY:"auto"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-              <div style={{fontSize:mobile?18:20,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Week {activeWk}</div>
-              {activeWk===CW&&<Pill color={P.accent} bg={P.accentLight}>Current</Pill>}
+      <div style={{overflow:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{fontSize:mobile?16:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Week {activeWk}</div>
+          <div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{wkLabel(activeWk)}</div>
+          {activeWk===CW&&<Pill color={P.accent} bg={P.al}>Current</Pill>}
+        </div>
+        <Bar pct={wPct(activeWk)} color={P.accent} P={P} style={{marginBottom:4}}/>
+        <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginBottom:14}}>{wPct(activeWk)}% this week</div>
+        {courses.length===0&&<div style={{fontSize:14,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",padding:"20px 0"}}>No courses yet. Add one below.</div>}
+        {courses.map(c=><Card key={c.id} P={P} style={{marginBottom:10,padding:0,overflow:"hidden"}}>
+          <div style={{display:"flex"}}>
+            <div style={{width:5,background:c.color,flexShrink:0}}/>
+            <div style={{flex:1,padding:"11px 13px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:P.ink,fontFamily:"'DM Sans',sans-serif"}}>{c.code}</div>
+                {c.name&&<div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{c.name}</div>}
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                {c.columns.map(col=>{const k=activeWk+"|"+c.id+"|"+col,dn=checks[k];return <div key={col} onClick={()=>tog(activeWk,c.id,col)} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",padding:"4px 10px",borderRadius:20,background:dn?c.color+"18":P.bg2,border:"1.5px solid "+(dn?c.color:P.border),transition:"all 0.15s"}}>
+                  <Check checked={!!dn} onChange={()=>tog(activeWk,c.id,col)} color={c.color} P={P}/>
+                  <span style={{fontSize:mobile?11:12,color:dn?c.color:P.ink2,fontFamily:"'DM Sans',sans-serif",fontWeight:dn?600:400}}>{col}</span>
+                </div>;})}
+                {addColFor===c.id?<div style={{display:"flex",gap:5,alignItems:"center"}}><Inp autoFocus value={newCol} onChange={e=>setNewCol(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addColTo(c.id)} placeholder="Column…" P={P} style={{fontSize:11,width:120,padding:"4px 8px"}}/><Btn onClick={()=>addColTo(c.id)} small P={P}>+</Btn><button onClick={()=>{setAddColFor(null);setNewCol("");}} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}}>✕</button></div>
+                :<button onClick={()=>setAddColFor(c.id)} style={{background:"none",border:"1.5px dashed "+P.border2,borderRadius:20,padding:"4px 9px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",transition:"all 0.12s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=c.color} onMouseLeave={e=>e.currentTarget.style.borderColor=P.border2}>+ col</button>}
+              </div>
+              <Bar pct={c.columns.length?Math.round(c.columns.filter(col=>checks[activeWk+"|"+c.id+"|"+col]).length/c.columns.length*100):0} color={c.color} P={P} style={{marginTop:8}}/>
             </div>
-            <div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginBottom:10}}>{fmtTermWeek(activeWk)}</div>
-            <ProgBar pct={wPct(activeWk)} color={P.accent} P={P} style={{marginBottom:14}}/>
-            {courses.map(c=>(
-              <Card key={c.id} P={P} noHover style={{marginBottom:10,padding:0,overflow:"hidden"}}>
-                <div style={{display:"flex"}}>
-                  <div style={{width:5,background:c.color,flexShrink:0}}/>
-                  <div style={{flex:1,padding:"12px 14px"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                      <div style={{fontSize:13,fontWeight:700,color:P.ink,fontFamily:"'DM Sans',sans-serif"}}>{c.code}</div>
-                      {c.name&&<div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{c.name}</div>}
-                    </div>
-                    <ColToggleRow c={c} wk={activeWk}/>
-                    <ProgBar pct={(()=>{let t=0,d=0;c.columns.forEach(col=>{t++;if(checks[`${activeWk}|${c.id}|${col}`])d++;});return t?Math.round(d/t*100):0;})()} color={c.color} P={P} style={{marginTop:8}}/>
-                    <textarea value={getN(activeWk,c.id)} onChange={e=>setN(activeWk,c.id,e.target.value)} placeholder="notes…" style={{width:"100%",minHeight:34,background:P.bg2,border:`1px solid ${P.border}`,borderRadius:8,padding:"5px 10px",fontFamily:"'Caveat',cursive",fontSize:14,color:P.ink,resize:"vertical",outline:"none",marginTop:8}}/>
-                  </div>
+          </div>
+        </Card>)}
+      </div>
+    </div>}
+
+    {view==="course"&&<div style={{display:mobile?"block":"grid",gridTemplateColumns:"175px 1fr",gap:18}}>
+      <div style={{marginBottom:mobile?12:0}}>
+        {mobile?<div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4}}>
+          {courses.map(c=><button key={c.id} onClick={()=>setActiveC(c.id)} style={{flexShrink:0,background:c.id===activeC?c.color:"transparent",color:c.id===activeC?"#fff":P.ink2,border:"1.5px solid "+(c.id===activeC?c.color:P.border2),borderRadius:20,padding:"4px 13px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:c.id===activeC?600:400,whiteSpace:"nowrap"}}>{c.code}</button>)}
+          <button onClick={()=>setAddingC(true)} style={{flexShrink:0,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:20,padding:"4px 11px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3}}>+</button>
+        </div>:<>
+          <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>Courses</div>
+          {courses.map(c=><div key={c.id} style={{marginBottom:5}}>
+            <button onClick={()=>setActiveC(c.id)} style={{width:"100%",textAlign:"left",background:c.id===activeC?c.color+"18":"transparent",color:c.id===activeC?c.color:P.ink2,border:"1.5px solid "+(c.id===activeC?c.color+"66":"transparent"),borderRadius:9,padding:"7px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:c.id===activeC?700:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:7}}>
+              <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
+              <span style={{flex:1}}>{c.code}</span>
+              <span style={{fontSize:10,color:c.id===activeC?c.color:P.ink3}}>{cPct(c)}%</span>
+            </button>
+            <Bar pct={cPct(c)} color={c.color} P={P} style={{marginTop:2}}/>
+          </div>)}
+          <button onClick={()=>setAddingC(true)} style={{width:"100%",marginTop:8,background:"transparent",border:"1.5px dashed "+P.border2,borderRadius:9,padding:"7px 10px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ add course</button>
+        </>}
+      </div>
+      {ac?<div style={{overflow:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{width:12,height:12,borderRadius:"50%",background:ac.color}}/>
+          <div style={{fontSize:mobile?16:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{ac.code}{ac.name&&<span style={{fontWeight:400,fontSize:13,color:P.ink3,marginLeft:8}}>{ac.name}</span>}</div>
+          <div style={{flex:1}}/>
+          <Btn onClick={()=>setEditC({...ac})} v="ghost" small P={P}>Edit</Btn>
+        </div>
+        <Bar pct={cPct(ac)} color={ac.color} P={P} style={{marginBottom:4}}/>
+        <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginBottom:12}}>{cPct(ac)}% across the term</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",marginBottom:14}}>
+          {ac.columns.map(col=><div key={col} style={{display:"flex",alignItems:"center",gap:4,background:ac.color+"14",border:"1.5px solid "+ac.color+"33",borderRadius:20,padding:"3px 10px"}}>
+            <span style={{fontSize:12,color:ac.color,fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>{col}</span>
+            <button onClick={()=>remCol(ac.id,col)} style={{background:"none",border:"none",cursor:"pointer",color:ac.color,fontSize:11,opacity:0.6,lineHeight:1,padding:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.6}>✕</button>
+          </div>)}
+          {addColFor===ac.id?<div style={{display:"flex",gap:5,alignItems:"center"}}><Inp autoFocus value={newCol} onChange={e=>setNewCol(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addColTo(ac.id)} placeholder="New column…" P={P} style={{fontSize:11,width:130,padding:"4px 8px"}}/><Btn onClick={()=>addColTo(ac.id)} small P={P}>+</Btn><button onClick={()=>{setAddColFor(null);setNewCol("");}} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}}>✕</button></div>
+          :<button onClick={()=>setAddColFor(ac.id)} style={{background:"none",border:"1.5px dashed "+P.border2,borderRadius:20,padding:"3px 10px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",transition:"all 0.12s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=ac.color} onMouseLeave={e=>e.currentTarget.style.borderColor=P.border2}>+ add column</button>}
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"0 5px",minWidth:mobile?360:undefined}}>
+            <thead><tr>
+              <th style={{textAlign:"left",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 12px",width:130,textTransform:"uppercase",letterSpacing:"0.07em"}}>Week</th>
+              {ac.columns.map(col=><th key={col} style={{textAlign:"center",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 8px",textTransform:"uppercase",letterSpacing:"0.07em",minWidth:95}}>{col}</th>)}
+              {!mobile&&<th style={{textAlign:"left",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 8px",textTransform:"uppercase",letterSpacing:"0.07em",minWidth:150}}>Notes</th>}
+            </tr></thead>
+            <tbody>{wks.map(w=>{const isCW=w===CW;return <tr key={w}>
+              <td style={{padding:"2px 5px"}}><div style={{background:isCW?P.al:P.card,border:"1.5px solid "+(isCW?P.am:P.border),borderRadius:8,padding:"6px 9px"}}>
+                <div style={{fontSize:12,fontWeight:isCW?700:500,color:isCW?P.accent:P.ink,fontFamily:"'DM Sans',sans-serif"}}>Week {w}{isCW&&<Pill color={P.accent} bg={P.al} style={{fontSize:8,padding:"1px 5px",marginLeft:5}}>now</Pill>}</div>
+                <div style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{wkLabel(w)}</div>
+              </div></td>
+              {ac.columns.map(col=>{const k=w+"|"+ac.id+"|"+col,dn=checks[k];return <td key={col} style={{textAlign:"center",padding:"2px 5px"}}>
+                <div onClick={()=>tog(w,ac.id,col)} style={{background:dn?ac.color+"15":P.card,border:"1.5px solid "+(dn?ac.color:P.border),borderRadius:8,padding:"6px 7px",display:"flex",justifyContent:"center",alignItems:"center",cursor:"pointer",transition:"all 0.15s"}}>
+                  <Check checked={!!dn} onChange={()=>tog(w,ac.id,col)} color={ac.color} P={P}/>
                 </div>
-              </Card>
-            ))}
-          </div>
+              </td>;})}
+              {!mobile&&<td style={{padding:"2px 5px"}}><textarea value={getN(w,ac.id)} onChange={e=>setN(w,ac.id,e.target.value)} placeholder="notes…" style={{width:"100%",minWidth:130,minHeight:36,background:P.card,border:"1px solid "+P.border,borderRadius:8,padding:"5px 8px",fontFamily:"'Caveat',cursive",fontSize:14,color:P.ink,resize:"vertical",outline:"none"}}/></td>}
+            </tr>;})}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>:<div style={{fontSize:14,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",padding:"20px 0"}}>No courses yet. Add one.</div>}
+    </div>}
 
-      {view==="course"&&(
-        <div style={{display:mobile?"block":"grid",gridTemplateColumns:"180px 1fr",gap:18}}>
-          <div style={{marginBottom:mobile?12:0}}>
-            {mobile?(<div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:4}}>
-              {courses.map(c=><button key={c.id} onClick={()=>setActiveCourse(c.id)} style={{flexShrink:0,background:c.id===activeCourse?c.color:"transparent",color:c.id===activeCourse?"#fff":P.ink2,border:`1.5px solid ${c.id===activeCourse?c.color:P.border2}`,borderRadius:20,padding:"5px 14px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>{c.code}</button>)}
-              <button onClick={()=>setAddingCourse(true)} style={{flexShrink:0,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",color:P.ink3,fontSize:12}}>+</button>
-            </div>):(
-              <>
-                <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10,fontFamily:"'DM Sans',sans-serif"}}>Courses</div>
-                {courses.map(c=>{const isSel=c.id===activeCourse,pct=cPct(c);return(
-                  <div key={c.id} style={{marginBottom:6}}>
-                    <button onClick={()=>setActiveCourse(c.id)} style={{width:"100%",textAlign:"left",background:isSel?c.color+"18":"transparent",color:isSel?c.color:P.ink2,border:`1.5px solid ${isSel?c.color+"66":"transparent"}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:isSel?700:400,transition:"all 0.15s",display:"flex",alignItems:"center",gap:7}}>
-                      <div style={{width:9,height:9,borderRadius:"50%",background:c.color,flexShrink:0}}/>
-                      <span style={{flex:1}}>{c.code}</span>
-                      <span style={{fontSize:10,color:isSel?c.color:P.ink3}}>{pct}%</span>
-                    </button>
-                    <ProgBar pct={pct} color={c.color} P={P} style={{marginTop:2}}/>
-                  </div>
-                );})}
-                <button onClick={()=>setAddingCourse(true)} style={{width:"100%",marginTop:8,background:"transparent",border:`1.5px dashed ${P.border2}`,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:P.ink3,transition:"all 0.12s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink3;}}>+ add course</button>
-              </>
-            )}
-          </div>
-          {acd&&(
-            <div style={{overflowY:"auto",animation:"slideUp 0.25s ease both"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                <div style={{width:12,height:12,borderRadius:"50%",background:acd.color}}/>
-                <div style={{fontSize:mobile?18:20,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{acd.code}{acd.name&&<span style={{fontWeight:400,fontSize:14,color:P.ink3,marginLeft:8}}>{acd.name}</span>}</div>
-                <div style={{flex:1}}/>
-                <Btn onClick={()=>setEditCourse({...acd})} variant="ghost" small P={P}>Edit</Btn>
-              </div>
-              <ProgBar pct={cPct(acd)} color={acd.color} P={P} style={{marginBottom:4}}/>
-              <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginBottom:14}}>{cPct(acd)}% complete across the term</div>
-              <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center",marginBottom:14}}>
-                {acd.columns.map(col=>(
-                  <div key={col} style={{display:"flex",alignItems:"center",gap:5,background:acd.color+"14",border:`1.5px solid ${acd.color}33`,borderRadius:20,padding:"3px 11px"}}>
-                    <span style={{fontSize:12,color:acd.color,fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>{col}</span>
-                    <button onClick={()=>remCol(acd.id,col)} style={{background:"none",border:"none",cursor:"pointer",color:acd.color,fontSize:11,opacity:0.6,lineHeight:1,padding:0}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.6}>✕</button>
-                  </div>
-                ))}
-                {addingColFor===acd.id?<div style={{display:"flex",gap:5,alignItems:"center"}}><Inp value={newColText} onChange={e=>setNewColText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCol(acd.id)} placeholder="New column…" style={{fontSize:11,width:130,padding:"5px 9px"}} P={P}/><Btn onClick={()=>addCol(acd.id)} small P={P}>+</Btn><button onClick={()=>{setAddingColFor(null);setNewColText("");}} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13}}>✕</button></div>
-                :<button onClick={()=>setAddingColFor(acd.id)} style={{background:"none",border:`1.5px dashed ${P.border2}`,borderRadius:20,padding:"4px 10px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",transition:"all 0.12s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=acd.color} onMouseLeave={e=>e.currentTarget.style.borderColor=P.border2}>+ add column</button>}
-              </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"0 5px",minWidth:mobile?400:undefined}}>
-                  <thead><tr>
-                    <th style={{textAlign:"left",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 12px",width:90,textTransform:"uppercase",letterSpacing:"0.07em"}}>Week</th>
-                    {acd.columns.map(col=><th key={col} style={{textAlign:"center",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 8px",textTransform:"uppercase",letterSpacing:"0.07em",minWidth:100}}>{col}</th>)}
-                    {!mobile&&<th style={{textAlign:"left",fontFamily:"'DM Sans',sans-serif",fontSize:10,color:P.ink3,fontWeight:600,padding:"3px 8px",textTransform:"uppercase",letterSpacing:"0.07em",minWidth:160}}>Notes</th>}
-                  </tr></thead>
-                  <tbody>
-                    {weeks.map(w=>{const isCur=w===CW;return(
-                      <tr key={w}>
-                        <td style={{padding:"2px 6px"}}>
-                          <div style={{background:isCur?P.accentLight:P.white,border:`1.5px solid ${isCur?P.accentMid:P.border}`,borderRadius:9,padding:"7px 10px"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:5}}>
-                              <span style={{fontSize:12,fontWeight:isCur?700:500,color:isCur?P.accent:P.ink,fontFamily:"'DM Sans',sans-serif"}}>W{w}</span>
-                              {isCur&&<Pill color={P.accent} bg={P.accentLight} style={{fontSize:8,padding:"1px 6px"}}>now</Pill>}
-                            </div>
-                            <div style={{fontSize:9,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginTop:1}}>{fmtTermWeek(w)}</div>
-                          </div>
-                        </td>
-                        {acd.columns.map(col=>{const k=`${w}|${acd.id}|${col}`,done=checks[k];return(
-                          <td key={col} style={{textAlign:"center",padding:"2px 6px"}}>
-                            <div onClick={()=>tog(w,acd.id,col)} style={{background:done?acd.color+"15":P.white,border:`1.5px solid ${done?acd.color:P.border}`,borderRadius:9,padding:"7px 8px",display:"flex",justifyContent:"center",alignItems:"center",cursor:"pointer",transition:"all 0.15s"}}>
-                              <Check checked={!!done} onChange={()=>tog(w,acd.id,col)} color={acd.color} P={P}/>
-                            </div>
-                          </td>
-                        );})}
-                        {!mobile&&<td style={{padding:"2px 6px"}}><textarea value={getN(w,acd.id)} onChange={e=>setN(w,acd.id,e.target.value)} placeholder="notes…" style={{width:"100%",minWidth:140,minHeight:38,background:P.white,border:`1px solid ${P.border}`,borderRadius:9,padding:"6px 9px",fontFamily:"'Caveat',cursive",fontSize:14,color:P.ink,resize:"vertical",outline:"none"}}/></td>}
-                      </tr>
-                    );})}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {(addingCourse||editCourse)&&(
-        <div style={OV2} onClick={()=>{setAddingCourse(false);setEditCourse(null);}}>
-          <div style={{...MB2,maxWidth:mobile?"100%":380}} onClick={e=>e.stopPropagation()}>
-            {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"-8px auto 20px"}}/>}
-            <div style={{fontSize:19,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:18}}>{editCourse?"Edit Course":"Add Course"}</div>
-            <FR label="Code" P={P}><Inp value={(editCourse||newCourse).code} onChange={e=>editCourse?setEditCourse(p=>({...p,code:e.target.value})):setNewCourse(p=>({...p,code:e.target.value}))} placeholder="e.g. MA209" P={P}/></FR>
-            <FR label="Name" P={P}><Inp value={(editCourse||newCourse).name} onChange={e=>editCourse?setEditCourse(p=>({...p,name:e.target.value})):setNewCourse(p=>({...p,name:e.target.value}))} placeholder="Full name (optional)" P={P}/></FR>
-            <FR label="Colour" P={P}><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{CCOLS.map(c=><div key={c} onClick={()=>editCourse?setEditCourse(p=>({...p,color:c})):setNewCourse(p=>({...p,color:c}))} style={{width:26,height:26,borderRadius:"50%",background:c,cursor:"pointer",border:(editCourse||newCourse).color===c?`3px solid ${P.ink}`:"3px solid transparent",transition:"border 0.1s"}}/>)}</div></FR>
-            {editCourse&&<FR label="Columns" P={P}><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{editCourse.columns.map(col=><div key={col} style={{display:"flex",alignItems:"center",gap:4,background:P.bg2,border:`1px solid ${P.border}`,borderRadius:20,padding:"3px 10px"}}><span style={{fontSize:12,color:P.ink2,fontFamily:"'DM Sans',sans-serif"}}>{col}</span><button onClick={()=>setEditCourse(p=>({...p,columns:p.columns.filter(c=>c!==col)}))} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:11,lineHeight:1,padding:0}}>✕</button></div>)}</div></FR>}
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:18,paddingBottom:mobile?12:0}}>
-              {editCourse?<Btn onClick={()=>{setCourses(p=>p.filter(c=>c.id!==editCourse.id));setEditCourse(null);}} variant="danger" P={P}>Delete</Btn>:<span/>}
-              <div style={{display:"flex",gap:8}}><Btn onClick={()=>{setAddingCourse(false);setEditCourse(null);}} variant="ghost" P={P}>Cancel</Btn><Btn onClick={saveCourse} P={P}>Save</Btn></div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    {(addingC||editC)&&<Overlay onClose={()=>{setAddingC(false);setEditC(null);}} P={P} mobile={mobile}>
+      <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginBottom:18}}>{editC?"Edit Course":"Add Course"}</div>
+      <FR label="Code" P={P}><Inp value={(editC||newC).code} onChange={e=>editC?setEditC(p=>({...p,code:e.target.value})):setNewC(p=>({...p,code:e.target.value}))} placeholder="e.g. MA209" P={P}/></FR>
+      <FR label="Name" P={P}><Inp value={(editC||newC).name} onChange={e=>editC?setEditC(p=>({...p,name:e.target.value})):setNewC(p=>({...p,name:e.target.value}))} placeholder="Full name (optional)" P={P}/></FR>
+      <FR label="Colour" P={P}><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{CCOLS.map(c=><div key={c} onClick={()=>editC?setEditC(p=>({...p,color:c})):setNewC(p=>({...p,color:c}))} style={{width:26,height:26,borderRadius:"50%",background:c,cursor:"pointer",border:(editC||newC).color===c?"3px solid "+P.ink:"3px solid transparent",transition:"border 0.1s"}}/>)}</div></FR>
+      {editC&&<FR label="Columns" P={P}><div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{editC.columns.map(col=><div key={col} style={{display:"flex",alignItems:"center",gap:4,background:P.bg2,border:"1px solid "+P.border,borderRadius:20,padding:"3px 9px"}}><span style={{fontSize:12,color:P.ink2,fontFamily:"'DM Sans',sans-serif"}}>{col}</span><button onClick={()=>setEditC(p=>({...p,columns:p.columns.filter(c=>c!==col)}))} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:11,lineHeight:1,padding:0}}>✕</button></div>)}</div></FR>}
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:18}}>
+        {editC?<Btn onClick={()=>delC(editC.id)} v="danger" P={P}>Delete</Btn>:<span/>}
+        <div style={{display:"flex",gap:8}}><Btn onClick={()=>{setAddingC(false);setEditC(null);}} v="ghost" P={P}>Cancel</Btn><Btn onClick={saveC} P={P}>Save</Btn></div>
+      </div>
+    </Overlay>}
+  </div>;
 }
 
-// ─── Search ───────────────────────────────────────────────────────────────────
-function SearchBar({events,tasks,calendars,onClose,P,mobile}){
+// ── Search ────────────────────────────────────────────────────────────────────
+function SearchView({events,tasks,cals,onClose,P,mobile}){
   const[q,setQ]=useState("");const ref=useRef(null);
-  useEffect(()=>{ref.current?.focus();},[]);
+  useEffect(()=>{ref.current&&ref.current.focus();},[]);
   const lq=q.toLowerCase();
   const evRes=q.length>1?events.filter(e=>(e.title||"").toLowerCase().includes(lq)||(e.notes||"").toLowerCase().includes(lq)):[];
   const tkRes=q.length>1?tasks.filter(t=>(t.title||"").toLowerCase().includes(lq)||(t.notes||"").toLowerCase().includes(lq)):[];
-  return(
-    <div style={mkOV(mobile)} onClick={onClose}>
-      <div style={{background:P.white,borderRadius:mobile?"20px 20px 0 0":16,width:"100%",maxWidth:mobile?"100%":560,maxHeight:mobile?"80vh":"70vh",overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:mobile?"0 -8px 40px rgba(0,0,0,0.2)":"0 20px 60px rgba(0,0,0,0.25)",animation:"slideUp 0.2s ease both"}} onClick={e=>e.stopPropagation()}>
-        {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"12px auto 0"}}/>}
-        <div style={{padding:"14px 18px",borderBottom:`1px solid ${P.border}`,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          <Icons.Search color={P.ink3}/>
-          <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search events and tasks…" onKeyDown={e=>e.key==="Escape"&&onClose()} style={{flex:1,border:"none",outline:"none",fontSize:15,color:P.ink,background:"transparent",fontFamily:"'DM Sans',sans-serif"}}/>
-          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:18,padding:"4px 8px"}}>✕</button>
-        </div>
-        <div style={{overflowY:"auto",flex:1}}>
-          {q.length>1&&evRes.length===0&&tkRes.length===0&&<div style={{padding:"24px 18px",textAlign:"center",color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>No results for "{q}"</div>}
-          {evRes.length>0&&(<><div style={{padding:"8px 18px 3px",fontSize:10,fontWeight:700,color:P.ink3,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>Events</div>
-            {evRes.map(ev=>{const cal=calendars.find(c=>c.id===ev.calendarId),color=cal?.color||P.accent;return(
-              <div key={ev.id} style={{padding:"9px 18px",display:"flex",gap:10,alignItems:"center",transition:"background 0.1s",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
-                <div style={{flex:1}}><div style={{fontSize:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ev.title}</div><div style={{fontSize:11,color:P.ink3}}>{ev.date}{ev.startTime?` · ${fmtT(ev.startTime)}`:""}{ev.recurring?" · recurring":""}</div></div>
-              </div>
-            );})}
-          </>)}
-          {tkRes.length>0&&(<><div style={{padding:"8px 18px 3px",fontSize:10,fontWeight:700,color:P.ink3,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'DM Sans',sans-serif"}}>Tasks</div>
-            {tkRes.map(t=>(
-              <div key={t.id} style={{padding:"9px 18px",display:"flex",gap:10,alignItems:"center",transition:"background 0.1s",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <Check checked={t.done} onChange={()=>{}} color={t.urgent?P.accent:P.navy} P={P}/>
-                <div style={{flex:1}}><div style={{fontSize:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>{t.dueDate&&<div style={{fontSize:11,color:P.ink3}}>Due {t.dueDate}</div>}</div>
-                {t.urgent&&<Pill color={P.accent} bg={P.accentLight} style={{fontSize:10}}>urgent</Pill>}
-              </div>
-            ))}
-          </>)}
-          {q.length<=1&&<div style={{padding:"28px 18px",textAlign:"center",color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>Start typing to search…</div>}
-        </div>
-      </div>
+  return <Overlay onClose={onClose} P={P} mobile={mobile}>
+    <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:14}}>
+      <I.Search s={17} c={P.ink3}/><input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search events and tasks…" onKeyDown={e=>e.key==="Escape"&&onClose()} style={{flex:1,border:"none",outline:"none",fontSize:15,color:P.ink,background:"transparent",fontFamily:"'DM Sans',sans-serif"}}/>
+      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:18}}>✕</button>
     </div>
-  );
+    {q.length>1&&evRes.length===0&&tkRes.length===0&&<div style={{textAlign:"center",color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",padding:"16px 0"}}>No results for "{q}"</div>}
+    {evRes.length>0&&<><div style={{fontSize:10,fontWeight:700,color:P.ink3,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>Events</div>{evRes.map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId);return <div key={ev.id} style={{padding:"8px 9px",display:"flex",gap:9,alignItems:"center",cursor:"pointer",borderRadius:8,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><div style={{width:8,height:8,borderRadius:"50%",background:cal?cal.color:P.accent,flexShrink:0}}/><div style={{flex:1}}><div style={{fontSize:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ev.title}</div><div style={{fontSize:11,color:P.ink3}}>{ev.date}{ev.startTime?" · "+fmtT(ev.startTime):""}</div></div></div>;})}
+    </>}
+    {tkRes.length>0&&<><div style={{fontSize:10,fontWeight:700,color:P.ink3,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6,marginTop:10,fontFamily:"'DM Sans',sans-serif"}}>Tasks</div>{tkRes.map(t=><div key={t.id} style={{padding:"8px 9px",display:"flex",gap:9,alignItems:"center",cursor:"pointer",borderRadius:8,transition:"background 0.1s"}} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}><Check checked={t.done} onChange={()=>{}} color={t.urgent?P.accent:P.navy} P={P}/><div style={{flex:1}}><div style={{fontSize:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>{t.dueDate&&<div style={{fontSize:11,color:P.ink3}}>Due {t.dueDate}</div>}</div>{t.urgent&&<Pill color={P.accent} bg={P.al} style={{fontSize:10}}>urgent</Pill>}</div>)}</>}
+    {q.length<=1&&<div style={{textAlign:"center",color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",padding:"16px 0"}}>Start typing…</div>}
+  </Overlay>;
 }
 
-// ─── Settings ─────────────────────────────────────────────────────────────────
-function SettingsPanel({dark,setDark,accent,setAccent,onReset,onClose,P,mobile}){
-  return(
-    <div style={mkOV(mobile)} onClick={onClose}>
-      <div style={{...mkMB(P,mobile),maxWidth:mobile?"100%":380}} onClick={e=>e.stopPropagation()}>
-        {mobile&&<div style={{width:40,height:4,borderRadius:2,background:P.border2,margin:"-8px auto 20px"}}/>}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-          <div style={{fontSize:19,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Settings</div>
-          <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3}}>✕</button>
-        </div>
-        <div style={{marginBottom:20}}>
-          <Lbl P={P}>Appearance</Lbl>
-          <div style={{display:"flex",gap:10,marginTop:8}}>
-            <button onClick={()=>setDark(false)} style={{flex:1,background:!dark?P.accentLight:"transparent",border:`1.5px solid ${!dark?P.accentMid:P.border2}`,borderRadius:10,padding:"9px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:!dark?600:400,color:!dark?P.accent:P.ink2,transition:"all 0.15s"}}>Light</button>
-            <button onClick={()=>setDark(true)} style={{flex:1,background:dark?P.accentLight:"transparent",border:`1.5px solid ${dark?P.accentMid:P.border2}`,borderRadius:10,padding:"9px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:dark?600:400,color:dark?P.accent:P.ink2,transition:"all 0.15s"}}>Dark</button>
-          </div>
-        </div>
-        <div style={{marginBottom:22}}>
-          <Lbl P={P}>Accent Colour</Lbl>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:8}}>
-            {ACCENT_PRESETS.map(c=><div key={c} onClick={()=>setAccent(c)} style={{width:30,height:30,borderRadius:"50%",background:c,cursor:"pointer",border:accent===c?`3px solid ${P.ink}`:"3px solid transparent",transition:"all 0.15s"}}/>)}
-          </div>
-          <div style={{display:"flex",gap:10,alignItems:"center",marginTop:10}}>
-            <span style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>Custom:</span>
-            <input type="color" value={accent} onChange={e=>setAccent(e.target.value)} style={{width:32,height:32,border:`1px solid ${P.border}`,borderRadius:8,cursor:"pointer",background:"none",padding:2}}/>
-          </div>
-        </div>
-        <div style={{borderTop:`1px solid ${P.border}`,paddingTop:18}}>
-          <Lbl P={P}>Data</Lbl>
-          <Btn onClick={onReset} variant="danger" P={P} style={{marginTop:8,width:"100%",justifyContent:"center"}}>Reset to demo data</Btn>
-        </div>
+// ── Settings ──────────────────────────────────────────────────────────────────
+function SettingsView({dark,setDark,accent,setAccent,onReset,onClose,P,mobile}){
+  return <Overlay onClose={onClose} P={P} mobile={mobile}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+      <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Settings</div>
+      <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:P.ink3}}>✕</button>
+    </div>
+    <div style={{marginBottom:18}}>
+      <Lbl P={P}>Appearance</Lbl>
+      <div style={{display:"flex",gap:10,marginTop:6}}>
+        <button onClick={()=>setDark(false)} style={{flex:1,background:!dark?P.al:"transparent",border:"1.5px solid "+(!dark?P.am:P.border2),borderRadius:9,padding:"9px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:!dark?600:400,color:!dark?P.accent:P.ink2,transition:"all 0.15s"}}>☀️ Light</button>
+        <button onClick={()=>setDark(true)} style={{flex:1,background:dark?P.al:"transparent",border:"1.5px solid "+(dark?P.am:P.border2),borderRadius:9,padding:"9px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:dark?600:400,color:dark?P.accent:P.ink2,transition:"all 0.15s"}}>🌙 Dark</button>
       </div>
     </div>
-  );
+    <div style={{marginBottom:20}}>
+      <Lbl P={P}>Accent Colour</Lbl>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
+        {ACCENTS.map(c=><div key={c} onClick={()=>setAccent(c)} style={{width:30,height:30,borderRadius:"50%",background:c,cursor:"pointer",border:accent===c?"3px solid "+P.ink:"3px solid transparent",transition:"all 0.15s"}}/>)}
+      </div>
+      <div style={{display:"flex",gap:9,alignItems:"center",marginTop:9}}>
+        <span style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>Custom:</span>
+        <input type="color" value={accent} onChange={e=>setAccent(e.target.value)} style={{width:32,height:32,border:"1px solid "+P.border,borderRadius:8,cursor:"pointer",background:"none",padding:2}}/>
+      </div>
+    </div>
+    <div style={{borderTop:"1px solid "+P.border,paddingTop:16}}>
+      <Lbl P={P}>Data</Lbl>
+      <Btn onClick={onReset} v="danger" P={P} style={{marginTop:8,width:"100%",justifyContent:"center"}}>Reset all data</Btn>
+    </div>
+  </Overlay>;
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
+// ── App ───────────────────────────────────────────────────────────────────────
 function App(){
-  const{w}=useWindowSize(); const mobile=w<768;
-  const[dark,setDark]=useState(()=>lsGet("dark8",false));
-  const[accent,setAccent]=useState(()=>lsGet("accent8","#c13b2e"));
-  const P=makeP(dark,accent);
+  const winW=useWinW(); const mobile=winW<768;
+  const[dark,setDark]=useState(()=>lsGet("dark9",false));
+  const[accent,setAccent]=useState(()=>lsGet("accent9","#c13b2e"));
+  const P=mkP(dark,accent);
   const[tab,setTab]=useState("month");
   const[year,setYear]=useState(()=>new Date().getFullYear());
   const[month,setMonth]=useState(()=>new Date().getMonth());
-  const[events,setEvents]=useState(()=>lsGet("events8",makeDemoEvents()));
-  const[tasks,setTasks]=useState(()=>{const t=lsGet("tasks8",makeDemoTasks());return t.filter(x=>!x.isCourseTask);});
-  const[simpleLists,setSimpleLists]=useState(()=>lsGet("simpleLists8",makeDemoSimpleLists()));
-  const[calendars,setCalendars]=useState(()=>lsGet("calendars8",DEF_CALS));
-  const[showEventModal,setShowEventModal]=useState(false);
-  const[editEvent,setEditEvent]=useState(null);
+  const[events,setEvents]=useState(()=>lsGet("events9",[]));
+  const[tasks,setTasks]=useState(()=>lsGet("tasks9",[]).filter(t=>!t.isCourseTask));
+  const[slists,setSlists]=useState(()=>lsGet("slists9_data",[]));
+  const[cals,setCals]=useState(()=>lsGet("cals9",[]));
+  const[wkOff,setWkOff]=useState(0);
+  const[hiDate,setHiDate]=useState(null);
+  const[evModal,setEvModal]=useState(null);
   const[prefillDate,setPrefillDate]=useState(null);
-  const[weekOffset,setWeekOffset]=useState(0);
-  const[highlightDate,setHighlightDate]=useState(null);
-  const[showAddTask,setShowAddTask]=useState(false);
-  const[editWeekTask,setEditWeekTask]=useState(null);
+  const[addTaskModal,setAddTaskModal]=useState(false);
+  const[editWkTask,setEditWkTask]=useState(null);
   const[showSearch,setShowSearch]=useState(false);
   const[showSettings,setShowSettings]=useState(false);
-  const[tabKey,setTabKey]=useState(0);
   const[syncing,setSyncing]=useState(false);
-  const[loaded,setLoaded]=useState(true); // render immediately, sync in background
-  const sbReady=useRef(false); // true once initial Supabase load completes
-
-  useEffect(()=>{lsSave("events8",events);if(sbReady.current)sched("events8",events);},[events]);
-  useEffect(()=>{lsSave("tasks8",tasks);if(sbReady.current)sched("tasks8",tasks);},[tasks]);
-  useEffect(()=>{lsSave("simpleLists8",simpleLists);if(sbReady.current)sched("simpleLists8",simpleLists);},[simpleLists]);
-  useEffect(()=>{lsSave("calendars8",calendars);if(sbReady.current)sched("calendars8",calendars);},[calendars]);
-  useEffect(()=>{lsSave("dark8",dark);if(sbReady.current)sbSetSetting("dark8",String(dark));},[dark]);
-  useEffect(()=>{lsSave("accent8",accent);if(sbReady.current)sbSetSetting("accent8",accent);},[accent]);
-
+  const[tabKey,setTabKey]=useState(0);
+  const sbReady=useRef(false);
   const syncT=useRef(null);
-  function sched(key,data){clearTimeout(syncT.current);syncT.current=setTimeout(async()=>{setSyncing(true);await sbUpsert(key,data);setSyncing(false);},1400);}
 
+  // Load from Supabase in background (non-blocking)
   useEffect(()=>{
-    // Load from localStorage immediately (already done via useState defaults)
-    // Then try Supabase in background with a strict 5s timeout per request
-    sbReady.current = true; // allow saves immediately
-    async function syncFromCloud(){
-      try {
-        const withTimeout = (p) => Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),5000))]);
-        const [ev,tk,sl,ca,d,ac] = await Promise.all([
-          withTimeout(sbGet("events8")), withTimeout(sbGet("tasks8")),
-          withTimeout(sbGet("simpleLists8")), withTimeout(sbGet("calendars8")),
-          withTimeout(sbGetSetting("dark8")), withTimeout(sbGetSetting("accent8")),
-        ]);
-        // Only overwrite local if cloud has more recent data (non-empty)
-        if(ev && ev.length > 0) setEvents(ev);
-        if(tk && tk.length > 0) setTasks(tk.filter(t=>!t.isCourseTask));
-        if(sl && sl.length > 0) setSimpleLists(sl);
-        if(ca && ca.length > 0) setCalendars(ca);
-        if(d !== null) setDark(d==="true");
-        if(ac) setAccent(ac);
-      } catch(e){ /* Supabase unavailable, keep local data */ }
+    async function load(){
+      try{
+        const[ev,tk,sl,ca,d,ac]=await Promise.all([sbGet("ev9"),sbGet("tk9"),sbGet("sl9"),sbGet("ca9"),sbGetS("dark9"),sbGetS("accent9")]);
+        if(ev&&ev.length)setEvents(ev);
+        if(tk&&tk.length)setTasks(tk.filter(t=>!t.isCourseTask));
+        if(sl&&sl.length)setSlists(sl);
+        if(ca&&ca.length)setCals(ca);
+        if(d!==null)setDark(d==="true");
+        if(ac)setAccent(ac);
+      }catch(e){}
+      sbReady.current=true;
     }
-    syncFromCloud();
+    load();
+    // Allow saves even if Supabase never responds
+    setTimeout(()=>{sbReady.current=true;},6000);
   },[]);
 
+  function sched(k,data){clearTimeout(syncT.current);syncT.current=setTimeout(async()=>{setSyncing(true);await sbSet(k,data);setSyncing(false);},1500);}
+  useEffect(()=>{lsSet("events9",events);if(sbReady.current)sched("ev9",events);},[events]);
+  useEffect(()=>{lsSet("tasks9",tasks);if(sbReady.current)sched("tk9",tasks);},[tasks]);
+  useEffect(()=>{lsSet("slists9_data",slists);if(sbReady.current)sched("sl9",slists);},[slists]);
+  useEffect(()=>{lsSet("cals9",cals);if(sbReady.current)sched("ca9",cals);},[cals]);
+  useEffect(()=>{lsSet("dark9",dark);if(sbReady.current)sbSetS("dark9",String(dark));},[dark]);
+  useEffect(()=>{lsSet("accent9",accent);if(sbReady.current)sbSetS("accent9",accent);},[accent]);
+
+  // Keyboard shortcuts
   useEffect(()=>{
-    function onKey(e){
+    function h(e){
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
-      if(e.key==="n"||e.key==="N"){if(tab==="tasks")setShowAddTask(true);else{setEditEvent(null);setPrefillDate(null);setShowEventModal(true);}}
-      if((e.key==="/")||(e.key==="k"&&(e.metaKey||e.ctrlKey))){e.preventDefault();setShowSearch(true);}
+      if(e.key==="n"||e.key==="N"){if(tab==="tasks")setAddTaskModal(true);else{setEvModal(null);setPrefillDate(null);setEvModal("new");}}
+      if(e.key==="/"||((e.metaKey||e.ctrlKey)&&e.key==="k")){e.preventDefault();setShowSearch(true);}
       if(e.key==="Escape"){setShowSearch(false);setShowSettings(false);}
     }
-    window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
   },[tab]);
 
   function switchTab(t){setTab(t);setTabKey(k=>k+1);}
-  function doReset(){
-    ["events8","tasks8","simpleLists8","calendars8","taskLists8","courseChecks8","courseNotes8","courses8","checks8","cnotes8"].forEach(k=>localStorage.removeItem(k));
-    setEvents([]);setTasks([]);setSimpleLists([]);setCalendars([]);setShowSettings(false);
-  }
-  function getWeekStart(off){const now=new Date();const s=new Date(now);s.setDate(now.getDate()-now.getDay()+off*7);s.setHours(0,0,0,0);return s;}
-  const weekStart=getWeekStart(weekOffset);
+  function doReset(){["events9","tasks9","slists9_data","cals9","checks9","cnotes9","courses9","tlists9"].forEach(k=>localStorage.removeItem(k));setEvents([]);setTasks([]);setSlists([]);setCals([]);setShowSettings(false);}
+
+  function getWkStart(off){const n=new Date();const s=new Date(n);s.setDate(n.getDate()-n.getDay()+off*7);s.setHours(0,0,0,0);return s;}
+  const wkStart=getWkStart(wkOff);
+
   function handleDayClick(ds){
     const cl=new Date(ds+"T00:00:00"),now=new Date();now.setHours(0,0,0,0);
     const tSun=new Date(now);tSun.setDate(now.getDate()-now.getDay());tSun.setHours(0,0,0,0);
     const cSun=new Date(cl);cSun.setDate(cl.getDate()-cl.getDay());cSun.setHours(0,0,0,0);
-    setWeekOffset(Math.round((cSun-tSun)/(7*86400000)));setHighlightDate(ds);switchTab("week");
+    setWkOff(Math.round((cSun-tSun)/(7*86400000)));setHiDate(ds);switchTab("week");
   }
-  function saveEvent(f){setEvents(p=>{const e=p.find(x=>x.id===f.id);return e?p.map(x=>x.id===f.id?f:x):[...p,f];});setShowEventModal(false);setEditEvent(null);setPrefillDate(null);}
-  function delEvent(id){setEvents(p=>p.filter(e=>e.id!==id));setShowEventModal(false);setEditEvent(null);}
-  function defLists(){try{return JSON.parse(localStorage.getItem("taskLists8"))||[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}];}catch{return[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}];}}
-  function wkLabel(){const ws=weekStart,we=new Date(ws);we.setDate(ws.getDate()+6);return`${ws.getDate()} ${MONTHS[ws.getMonth()].slice(0,3)} – ${we.getDate()} ${MONTHS[we.getMonth()].slice(0,3)}, ${ws.getFullYear()}`;}
+  function saveEvent(f){setEvents(p=>{const e=p.find(x=>x.id===f.id);return e?p.map(x=>x.id===f.id?f:x):[...p,f];});setEvModal(null);setPrefillDate(null);}
+  function delEvent(id){setEvents(p=>p.filter(e=>e.id!==id));setEvModal(null);}
+  function wkLabel2(){const ws=wkStart,we=new Date(ws);we.setDate(ws.getDate()+6);const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return ws.getDate()+" "+mo[ws.getMonth()]+" – "+we.getDate()+" "+mo[we.getMonth()]+", "+ws.getFullYear();}
+  function defLists(){return lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]);}
 
-  const urgentCount=tasks.filter(t=>!t.done&&!t.isCourseTask&&(t.urgent||(t.dueDate&&daysUntil(t.dueDate)<0))).length;
-
-  // Course tasks computed live from checks — only for week panel display
-  const courseTasks = (() => {
-    const result = [];
-    for(let w=1; w<=TW; w++){
-      const end = termWeekEndDate(w);
-      const dueDateStr = `${end.getFullYear()}-${p2(end.getMonth()+1)}-${p2(end.getDate())}`;
-      courses.forEach(c => {
-        c.columns.forEach(col => {
-          if (!checks[`${w}|${c.id}|${col}`]) {
-            result.push({
-              id: `ct-${w}-${c.id}-${col}`,
-              title: `${c.code}: ${col}`,
-              notes: `Week ${w} · ${fmtTermWeek(w)}`,
-              dueDate: dueDateStr,
-              courseColor: c.color,
-              courseId: c.id,
-              weekNum: w,
-              urgent: w <= CW,
-            });
+  // Course tasks for week panel (computed live)
+  const courseTasks=(()=>{
+    const checks=lsGet("checks9",{});
+    const courses=lsGet("courses9",[]);
+    const result=[];
+    for(let w=1;w<=TW;w++){
+      courses.forEach(c=>{
+        c.columns.forEach(col=>{
+          if(!checks[w+"|"+c.id+"|"+col]){
+            result.push({id:"ct-"+w+"-"+c.id+"-"+col.replace(/\s/g,"_"),title:c.code+": "+col,notes:"Week "+w+" · "+wkLabel(w),dueDate:wkDueStr(w),cc:c.color,urgent:w<=CW});
           }
         });
       });
@@ -1055,174 +825,134 @@ function App(){
     return result;
   })();
 
-
-  // Visible calendars list for sidebar toggle
-  const visibleCalIds=calendars.filter(c=>c.visible!==false).map(c=>c.id);
+  const urgentCount=tasks.filter(t=>!t.done&&(t.urgent||(t.dueDate&&daysUntil(t.dueDate)<0))).length;
 
   const TABS=[
-    {id:"month",label:"Month",Icon:Icons.Month},
-    {id:"week",label:"Week",Icon:Icons.Week},
-    {id:"tasks",label:"Tasks",Icon:Icons.Tasks,badge:urgentCount>0?urgentCount:null},
-    {id:"lists",label:"Lists",Icon:Icons.Lists},
-    {id:"courses",label:"Courses",Icon:Icons.Courses},
+    {id:"month",label:"Month",Icon:({c,s})=><I.Month c={c} s={s}/>},
+    {id:"week",label:"Week",Icon:({c,s})=><I.Week c={c} s={s}/>},
+    {id:"tasks",label:"Tasks",Icon:({c,s})=><I.Tasks c={c} s={s}/>,badge:urgentCount||null},
+    {id:"lists",label:"Lists",Icon:({c,s})=><I.Lists c={c} s={s}/>},
+    {id:"courses",label:"Courses",Icon:({c,s})=><I.Courses c={c} s={s}/>},
   ];
 
-  // ── Calendar toggle sidebar ──────────────────────────────────────────────────
-  const CalSidebar = () => (
-    <div style={{width:220,background:P.white,borderRadius:R,border:`1px solid ${P.border}`,padding:16,flexShrink:0,boxShadow:`0 4px 20px ${P.shadow}`,animation:"slideUp 0.25s ease both",alignSelf:"flex-start"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Calendars</div>
-      </div>
-      {calendars.map(c=>(
-        <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:9,cursor:"pointer",padding:"5px 6px",borderRadius:8,transition:"background 0.12s"}} onClick={()=>setCalendars(p=>p.map(x=>x.id===c.id?{...x,visible:x.visible===false?true:false}:x))} onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-          <div style={{width:14,height:14,borderRadius:4,background:c.visible!==false?c.color:"transparent",border:`2px solid ${c.color}`,flexShrink:0,transition:"background 0.15s"}}/>
-          <span style={{flex:1,fontSize:13,fontFamily:"'DM Sans',sans-serif",color:c.visible!==false?P.ink:P.ink3,textDecoration:c.visible===false?"line-through":"none"}}>{c.name}</span>
-          <input type="color" value={c.color} onChange={e=>setCalendars(p=>p.map(x=>x.id===c.id?{...x,color:e.target.value}:x))} onClick={e=>e.stopPropagation()} style={{width:18,height:18,border:"none",background:"none",cursor:"pointer",padding:0}}/>
+  const navBtnStyle=(active)=>({width:"100%",display:"flex",alignItems:"center",gap:10,background:active?P.al:"transparent",color:active?P.accent:P.ink2,border:"none",borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:active?700:400,transition:"all 0.15s",marginBottom:2,textAlign:"left"});
+
+  return <div style={{fontFamily:"'DM Sans',sans-serif",background:P.bg,color:P.ink,transition:"background 0.3s",display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
+    <style>{"select option{background:"+P.bg+";color:"+P.ink+";}"}</style>
+
+    {/* Desktop */}
+    {!mobile&&<div style={{display:"flex",height:"100vh",overflow:"hidden"}}>
+      {/* Sidebar */}
+      <div style={{width:216,background:P.card,borderRight:"1px solid "+P.border,display:"flex",flexDirection:"column",flexShrink:0}}>
+        <div style={{padding:"18px 14px 12px",display:"flex",alignItems:"center",gap:9,borderBottom:"1px solid "+P.border}}>
+          <I.Star s={26}/><span style={{fontSize:15,fontWeight:800,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",letterSpacing:"-0.02em"}}>Planner</span>
         </div>
-      ))}
-      <button onClick={()=>setCalendars(p=>p.map(c=>({...c,visible:true})))} style={{fontSize:11,color:P.ink3,background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",marginTop:4}}>Show all</button>
-    </div>
-  );
+        <div style={{padding:"10px 8px",flex:1,overflowY:"auto"}}>
+          <div style={{fontSize:10,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",padding:"0 6px",marginBottom:5,fontFamily:"'DM Sans',sans-serif"}}>Navigation</div>
+          {TABS.map(t=><button key={t.id} onClick={()=>switchTab(t.id)}
+            style={navBtnStyle(tab===t.id)}
+            onMouseEnter={e=>{if(tab!==t.id){e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink;}}}
+            onMouseLeave={e=>{if(tab!==t.id){e.currentTarget.style.background="transparent";e.currentTarget.style.color=P.ink2;}}}>
+            <t.Icon c={tab===t.id?P.accent:P.ink3} s={18}/>
+            {t.label}
+            {t.badge&&<span style={{marginLeft:"auto",background:P.accent,color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</span>}
+          </button>)}
 
-  return(
-    <div style={{fontFamily:"'DM Sans',sans-serif",background:P.bg,minHeight:"100vh",color:P.ink,transition:"background 0.3s,color 0.3s",display:"flex"}}>
-      <style>{`
-        *{box-sizing:border-box;}
-        @keyframes slideUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
-        @keyframes slideInRight{from{opacity:0;transform:translateX(40px);}to{opacity:1;transform:none;}}
-        @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
-        @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
-        ::-webkit-scrollbar{width:4px;height:4px;}
-        ::-webkit-scrollbar-track{background:transparent;}
-        ::-webkit-scrollbar-thumb{background:${P.border2};border-radius:3px;}
-        .day-add{opacity:0!important;}
-        div:hover>.day-add{opacity:1!important;}
-        ::placeholder{color:${P.ink3};opacity:0.5;}
-        input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{opacity:0.4;cursor:pointer;}
-        button:active{transform:scale(0.96);}
-        select option{background:${P.bg};color:${P.ink};}
-        html{-webkit-tap-highlight-color:transparent;}
-        body{overflow:hidden;}
-      `}</style>
+          {(tab==="month"||tab==="week")&&cals.length>0&&<div style={{marginTop:14,borderTop:"1px solid "+P.border,paddingTop:10}}>
+            <div style={{fontSize:10,fontWeight:600,color:P.ink3,letterSpacing:"0.08em",textTransform:"uppercase",padding:"0 6px",marginBottom:6,fontFamily:"'DM Sans',sans-serif"}}>Calendars</div>
+            {cals.map(c=><div key={c.id} onClick={()=>setCals(p=>p.map(x=>x.id===c.id?{...x,visible:x.visible===false?true:false}:x))}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",borderRadius:8,cursor:"pointer",marginBottom:2,opacity:c.visible===false?0.4:1,transition:"all 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.background=P.bg2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div style={{width:9,height:9,borderRadius:"50%",background:c.visible===false?P.ink3:c.color,flexShrink:0,transition:"background 0.15s"}}/>
+              <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:P.ink2}}>{c.name}</span>
+              {c.visible===false&&<span style={{fontSize:9,color:P.ink3}}>hidden</span>}
+            </div>)}
+          </div>}
 
-      {/* ── Desktop vertical left sidebar ── */}
-      {!mobile&&(
-        <div style={{width:64,flexShrink:0,background:P.white,borderRight:`1px solid ${P.border}`,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16,paddingBottom:16,gap:4,height:"100vh",position:"sticky",top:0,zIndex:100}}>
-          <div style={{marginBottom:20}}><AppIcon size={32}/></div>
-          {TABS.map(t=>(
-            <button key={t.id} onClick={()=>switchTab(t.id)} title={t.label}
-              style={{position:"relative",width:44,height:44,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,background:tab===t.id?P.accentLight:"transparent",border:"none",borderRadius:12,cursor:"pointer",color:tab===t.id?P.accent:P.ink3,transition:"all 0.15s"}}
-              onMouseEnter={e=>{if(tab!==t.id){e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink2;}}}
-              onMouseLeave={e=>{if(tab!==t.id){e.currentTarget.style.background="transparent";e.currentTarget.style.color=P.ink3;}}}>
-              <t.Icon size={20} color={tab===t.id?P.accent:undefined}/>
-              {t.badge&&<span style={{position:"absolute",top:4,right:4,background:P.accent,color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:8,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</span>}
-            </button>
-          ))}
-          <div style={{flex:1}}/>
-          <button onClick={()=>setShowSearch(true)} title="Search" style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:12,cursor:"pointer",color:P.ink3,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink2;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=P.ink3;}}>
-            <Icons.Search size={20}/>
+          {(tab==="month"||tab==="week")&&<button onClick={()=>{setEvModal("new");setPrefillDate(null);}}
+            style={{width:"100%",marginTop:10,background:P.accent,border:"none",borderRadius:10,padding:"8px 12px",cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,color:"#fff",fontWeight:600,display:"flex",alignItems:"center",gap:6,justifyContent:"center"}}>
+            <I.Plus s={13} c="#fff"/>New Event
+          </button>}
+        </div>
+        <div style={{padding:"8px",borderTop:"1px solid "+P.border,display:"flex",gap:5}}>
+          <button onClick={()=>setShowSearch(true)} style={{flex:1,background:P.bg2,border:"1px solid "+P.border,borderRadius:8,padding:"6px 8px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5,justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border;e.currentTarget.style.color=P.ink3;}}>
+            <I.Search s={13} c="currentColor"/>Search
           </button>
-          <button onClick={()=>setShowSettings(true)} title="Settings" style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",borderRadius:12,cursor:"pointer",color:P.ink3,transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background=P.bg2;e.currentTarget.style.color=P.ink2;}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=P.ink3;}}>
-            <Icons.Settings size={20}/>
+          <button onClick={()=>setShowSettings(true)} style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:8,padding:"6px 10px",cursor:"pointer",color:P.ink3,transition:"all 0.15s",display:"flex",alignItems:"center"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border;e.currentTarget.style.color=P.ink3;}}>
+            <I.Gear s={16} c="currentColor"/>
           </button>
         </div>
-      )}
-
-      {/* ── Main content area ── */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-        {/* Top bar (desktop) — for cal nav + event button */}
-        {!mobile&&(
-          <div style={{background:P.white,borderBottom:`1px solid ${P.border}`,padding:"10px 22px",display:"flex",alignItems:"center",gap:10,flexShrink:0,boxShadow:`0 1px 4px ${P.shadow}`}}>
-            <div style={{fontSize:15,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",marginRight:8}}>{TABS.find(t=>t.id===tab)?.label}</div>
-            {(tab==="month"||tab==="week")&&(<>
-              {tab==="month"&&(<>
-                <button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:15,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>‹</button>
-                <div style={{fontSize:16,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",minWidth:180,textAlign:"center"}}>{MONTHS[month]} {year}</div>
-                <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:15,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>›</button>
-                <Btn onClick={()=>{setMonth(new Date().getMonth());setYear(new Date().getFullYear());}} variant="ghost" small P={P}>Today</Btn>
-              </>)}
-              {tab==="week"&&(<>
-                <button onClick={()=>setWeekOffset(w=>w-1)} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:15,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>‹</button>
-                <div style={{fontSize:15,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",minWidth:240,textAlign:"center"}}>{wkLabel()}</div>
-                <button onClick={()=>setWeekOffset(w=>w+1)} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:15,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>›</button>
-                <Btn onClick={()=>{setWeekOffset(0);setHighlightDate(null);}} variant="ghost" small P={P}>This Week</Btn>
-              </>)}
-              <div style={{flex:1}}/>
-              <Btn onClick={()=>{setEditEvent(null);setPrefillDate(null);setShowEventModal(true);}} P={P} small>+ Event</Btn>
-            </>)}
-            {(tab==="tasks")&&<div style={{flex:1}}/>}
-            <div style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}><kbd style={{background:P.bg2,border:`1px solid ${P.border}`,borderRadius:4,padding:"1px 5px",fontSize:10}}>N</kbd> add · <kbd style={{background:P.bg2,border:`1px solid ${P.border}`,borderRadius:4,padding:"1px 5px",fontSize:10}}>/</kbd> search</div>
-          </div>
-        )}
-
-        {/* Scrollable content */}
-        <div style={{flex:1,overflowY:"auto",padding:mobile?"14px 14px 80px":"20px 22px",display:"flex",gap:18}}>
-          {/* Calendar visibility sidebar (month + week only) */}
-          {!mobile&&(tab==="month"||tab==="week")&&<CalSidebar/>}
-
-          <div style={{flex:1,minWidth:0}}>
-            {/* Mobile header */}
-            {mobile&&(
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}><AppIcon/><span style={{fontSize:16,fontWeight:800,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",letterSpacing:"-0.02em"}}>Planner</span></div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <button onClick={()=>setShowSearch(true)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,display:"flex",alignItems:"center",padding:4}}><Icons.Search size={20} color={P.ink3}/></button>
-                  <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,display:"flex",alignItems:"center",padding:4}}><Icons.Settings size={20} color={P.ink3}/></button>
-                  {(tab==="month"||tab==="week")&&<Btn onClick={()=>{setEditEvent(null);setPrefillDate(null);setShowEventModal(true);}} P={P} small>+ Event</Btn>}
-                </div>
-              </div>
-            )}
-            {mobile&&(tab==="month"||tab==="week")&&(
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                {tab==="month"&&(<>
-                  <button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
-                  <div style={{flex:1,fontSize:15,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",textAlign:"center"}}>{MONTHS[month].slice(0,3)} {year}</div>
-                  <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
-                  <button onClick={()=>{setMonth(new Date().getMonth());setYear(new Date().getFullYear());}} style={{background:"none",border:`1px solid ${P.border2}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>Today</button>
-                </>)}
-                {tab==="week"&&(<>
-                  <button onClick={()=>setWeekOffset(w=>w-1)} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
-                  <div style={{flex:1,fontSize:13,fontWeight:600,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",textAlign:"center"}}>{wkLabel()}</div>
-                  <button onClick={()=>setWeekOffset(w=>w+1)} style={{background:"none",border:`1.5px solid ${P.border2}`,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
-                </>)}
-              </div>
-            )}
-
-            {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} calendars={calendars} onDayClick={handleDayClick} onEventClick={ev=>{setEditEvent(ev);setShowEventModal(true);}} onAddEvent={ds=>{setPrefillDate(ds);setEditEvent(null);setShowEventModal(true);}} P={P} mobile={mobile}/>}
-            {tab==="week"&&<WeekView key={tabKey} weekStart={weekStart} events={events} tasks={tasks} calendars={calendars} highlightDate={highlightDate} onEventClick={ev=>{setEditEvent(ev);setShowEventModal(true);}} onAddEvent={ds=>{setPrefillDate(ds);setEditEvent(null);setShowEventModal(true);}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWeekTask(t)} onAddTask={()=>setShowAddTask(true)} P={P} mobile={mobile} courseTasks={courseTasks}/>}
-            {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={mobile}/>}
-            {tab==="lists"&&<SimpleListsView key={tabKey} simpleLists={simpleLists} setSimpleLists={setSimpleLists} P={P} mobile={mobile}/>}
-            {tab==="courses"&&<CourseTracker key={tabKey} P={P} mobile={mobile} tasks={tasks} setTasks={setTasks}/>}
-          </div>
+      </div>
+      {/* Main */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{background:P.card,borderBottom:"1px solid "+P.border,padding:"9px 20px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+          <div style={{fontSize:17,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",flex:1}}>{TABS.find(t=>t.id===tab)?.label}</div>
+          {tab==="month"&&<><button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}} style={{background:"none",border:"1.5px solid "+P.border2,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>‹</button>
+            <div style={{fontSize:15,fontWeight:600,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",minWidth:160,textAlign:"center"}}>{MONTHS[month]} {year}</div>
+            <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}} style={{background:"none",border:"1.5px solid "+P.border2,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>›</button>
+            <Btn onClick={()=>{setMonth(new Date().getMonth());setYear(new Date().getFullYear());}} v="ghost" small P={P}>Today</Btn></>}
+          {tab==="week"&&<><button onClick={()=>setWkOff(w=>w-1)} style={{background:"none",border:"1.5px solid "+P.border2,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>‹</button>
+            <div style={{fontSize:14,fontWeight:600,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif",minWidth:220,textAlign:"center"}}>{wkLabel2()}</div>
+            <button onClick={()=>setWkOff(w=>w+1)} style={{background:"none",border:"1.5px solid "+P.border2,borderRadius:9,width:30,height:30,cursor:"pointer",fontSize:14,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=P.accent;e.currentTarget.style.color=P.accent;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=P.border2;e.currentTarget.style.color=P.ink2;}}>›</button>
+            <Btn onClick={()=>{setWkOff(0);setHiDate(null);}} v="ghost" small P={P}>This Week</Btn></>}
+          <span style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginLeft:4}}><kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 5px",fontSize:10}}>N</kbd> add · <kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 5px",fontSize:10}}>/</kbd> search</span>
+        </div>
+        <div style={{flex:1,overflow:"auto",padding:"20px"}}>
+          {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>{setEvModal(ev);}} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={false}/>}
+          {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={false} courseTasks={courseTasks}/>}
+          {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={false}/>}
+          {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={false}/>}
+          {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={false}/>}
         </div>
       </div>
+    </div>}
 
-      {/* ── Mobile bottom tab bar ── */}
-      {mobile&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,background:P.white,borderTop:`1px solid ${P.border}`,display:"flex",zIndex:100,boxShadow:`0 -4px 20px ${P.shadow}`,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-          {TABS.map(t=>(
-            <button key={t.id} onClick={()=>switchTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"10px 4px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,position:"relative",transition:"all 0.15s"}}>
-              <t.Icon size={22} color={tab===t.id?P.accent:P.ink3}/>
-              <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif",letterSpacing:"0.02em"}}>{t.label}</span>
-              {tab===t.id&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:20,height:2,background:P.accent,borderRadius:"0 0 2px 2px"}}/>}
-              {t.badge&&<span style={{position:"absolute",top:5,right:"18%",background:P.accent,color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:8,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</span>}
-            </button>
-          ))}
+    {/* Mobile */}
+    {mobile&&<div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
+      <div style={{background:P.card,borderBottom:"1px solid "+P.border,padding:"9px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}><I.Star s={22}/><span style={{fontSize:14,fontWeight:800,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Planner</span></div>
+        <div style={{display:"flex",gap:7,alignItems:"center"}}>
+          {tab==="month"&&<><button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}} style={{background:"none",border:"1px solid "+P.border2,borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+            <span style={{fontSize:13,fontWeight:600,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{MONTHS[month].slice(0,3)} {year}</span>
+            <button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}} style={{background:"none",border:"1px solid "+P.border2,borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button></>}
+          {tab==="week"&&<><button onClick={()=>setWkOff(w=>w-1)} style={{background:"none",border:"1px solid "+P.border2,borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+            <span style={{fontSize:11,fontWeight:600,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{wkLabel2()}</span>
+            <button onClick={()=>setWkOff(w=>w+1)} style={{background:"none",border:"1px solid "+P.border2,borderRadius:7,width:28,height:28,cursor:"pointer",fontSize:13,color:P.ink2,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button></>}
+          {(tab==="month"||tab==="week")&&<Btn onClick={()=>{setEvModal("new");setPrefillDate(null);}} P={P} small style={{padding:"5px 11px",fontSize:11}}>+ Event</Btn>}
+          <button onClick={()=>setShowSearch(true)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,display:"flex",alignItems:"center"}}><I.Search s={17} c={P.ink3}/></button>
+          <button onClick={()=>setShowSettings(true)} style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,display:"flex",alignItems:"center"}}><I.Gear s={16} c={P.ink3}/></button>
         </div>
-      )}
+      </div>
+      <div style={{flex:1,overflow:"auto",padding:"14px 14px 78px"}}>
+        {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={true}/>}
+        {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={true} courseTasks={courseTasks}/>}
+        {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={true}/>}
+        {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={true}/>}
+        {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={true}/>}
+      </div>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:P.card,borderTop:"1px solid "+P.border,display:"flex",zIndex:100,boxShadow:"0 -4px 20px "+P.sh,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {TABS.map(t=><button key={t.id} onClick={()=>switchTab(t.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",padding:"9px 4px 7px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative",transition:"all 0.15s"}}>
+          <t.Icon c={tab===t.id?P.accent:P.ink3} s={21}/>
+          <span style={{fontSize:9,fontWeight:tab===t.id?700:400,color:tab===t.id?P.accent:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{t.label}</span>
+          {tab===t.id&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:18,height:2,background:P.accent,borderRadius:"0 0 2px 2px"}}/>}
+          {t.badge&&<span style={{position:"absolute",top:5,right:"14%",background:P.accent,color:"#fff",borderRadius:"50%",width:13,height:13,fontSize:8,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{t.badge}</span>}
+        </button>)}
+      </div>
+    </div>}
 
-      {showEventModal&&<EventModal event={editEvent||(prefillDate?{id:Date.now().toString(),title:"",calendarId:calendars[0]?.id||"",date:prefillDate,startTime:"",endTime:"",isSingleTime:false,location:"",notes:"",links:"",isMultiDay:false,multiDayEnd:"",showColorFill:false,urgent:false,done:false,recurring:false,recurringDays:[]}:null)} calendars={calendars} onSave={saveEvent} onDelete={delEvent} onClose={()=>{setShowEventModal(false);setEditEvent(null);setPrefillDate(null);}} P={P} mobile={mobile}/>}
-      {showAddTask&&<TaskModal task={null} lists={defLists()} onSave={f=>{setTasks(p=>[...p,f]);setShowAddTask(false);}} onDelete={()=>{}} onClose={()=>setShowAddTask(false)} P={P} mobile={mobile}/>}
-      {editWeekTask&&<TaskModal task={editWeekTask} lists={defLists()} onSave={f=>{setTasks(p=>p.map(t=>t.id===f.id?f:t));setEditWeekTask(null);}} onDelete={id=>{setTasks(p=>p.filter(t=>t.id!==id));setEditWeekTask(null);}} onClose={()=>setEditWeekTask(null)} P={P} mobile={mobile}/>}
-      {showSearch&&<SearchBar events={events} tasks={tasks} calendars={calendars} onClose={()=>setShowSearch(false)} P={P} mobile={mobile}/>}
-      {showSettings&&<SettingsPanel dark={dark} setDark={setDark} accent={accent} setAccent={setAccent} onReset={doReset} onClose={()=>setShowSettings(false)} P={P} mobile={mobile}/>}
-      <SyncDot syncing={syncing} P={P}/>
-    </div>
-  );
+    {/* Modals */}
+    {evModal&&<EventModal ev={evModal==="new"?null:evModal} cals={cals}
+      onSave={saveEvent} onDel={delEvent} onClose={()=>{setEvModal(null);setPrefillDate(null);}}
+      P={P} mobile={mobile}/>}
+    {addTaskModal&&<TaskModal task={null} lists={defLists()} onSave={f=>{setTasks(p=>[...p,f]);setAddTaskModal(false);}} onDel={()=>{}} onClose={()=>setAddTaskModal(false)} P={P} mobile={mobile}/>}
+    {editWkTask&&<TaskModal task={editWkTask} lists={defLists()} onSave={f=>{setTasks(p=>p.map(t=>t.id===f.id?f:t));setEditWkTask(null);}} onDel={id=>{setTasks(p=>p.filter(t=>t.id!==id));setEditWkTask(null);}} onClose={()=>setEditWkTask(null)} P={P} mobile={mobile}/>}
+    {showSearch&&<SearchView events={events} tasks={tasks} cals={cals} onClose={()=>setShowSearch(false)} P={P} mobile={mobile}/>}
+    {showSettings&&<SettingsView dark={dark} setDark={setDark} accent={accent} setAccent={setAccent} onReset={doReset} onClose={()=>setShowSettings(false)} P={P} mobile={mobile}/>}
+    <Sync on={syncing} P={P}/>
+  </div>;
 }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(App));
-  </script>
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
 </body>
 </html>
