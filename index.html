@@ -665,7 +665,7 @@ function CourseTracker({P,mobile,tasks,setTasks}){
   const[cNotes,setCNotes]=useState(()=>lsGet("courseNotes8",{}));
   const[view,setView]=useState("course");
   const[activeWk,setActiveWk]=useState(CW);
-  const[activeCourse,setActiveCourse]=useState(DEF_COURSES[0].id);
+  const[activeCourse,setActiveCourse]=useState(()=>lsGet("courses8",DEF_COURSES)[0]?.id||"");
   const[addingCourse,setAddingCourse]=useState(false);
   const[newCourse,setNewCourse]=useState({code:"",name:"",color:P.accent,columns:["Watched Lecture","Done Readings"]});
   const[editCourse,setEditCourse]=useState(null);
@@ -686,7 +686,7 @@ function CourseTracker({P,mobile,tasks,setTasks}){
   function remCol(cid,col){setCourses(p=>p.map(c=>c.id===cid?{...c,columns:c.columns.filter(x=>x!==col)}:c));}
   function saveCourse(){if(editCourse){setCourses(p=>p.map(c=>c.id===editCourse.id?editCourse:c));setEditCourse(null);}else if(newCourse.code.trim()){setCourses(p=>[...p,{...newCourse,id:Date.now().toString()}]);setNewCourse({code:"",name:"",color:P.accent,columns:["Watched Lecture","Done Readings"]});setAddingCourse(false);}}
   const weeks=Array.from({length:TW},(_,i)=>i+1);
-  const acd=courses.find(c=>c.id===activeCourse)||courses[0];
+  const acd=courses.find(c=>c.id===activeCourse)||courses[0]||null;
   function cPct(c){let t=0,d=0;weeks.forEach(w=>{c.columns.forEach(col=>{t++;if(checks[`${w}|${c.id}|${col}`])d++;});});return t?Math.round(d/t*100):0;}
   function wPct(wk){let t=0,d=0;courses.forEach(c=>{c.columns.forEach(col=>{t++;if(checks[`${wk}|${c.id}|${col}`])d++;});});return t?Math.round(d/t*100):0;}
 
