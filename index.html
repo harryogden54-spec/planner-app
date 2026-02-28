@@ -1032,26 +1032,29 @@ function App(){
   // Course tasks computed live from checks — only for week panel display
   const courseTasks = (() => {
     const result = [];
-    TERM_WEEKS.forEach(w => {
+    for(let w=1; w<=TW; w++){
+      const end = termWeekEndDate(w);
+      const dueDateStr = `${end.getFullYear()}-${p2(end.getMonth()+1)}-${p2(end.getDate())}`;
       courses.forEach(c => {
         c.columns.forEach(col => {
-          if (!checks[`${w.num}|${c.id}|${col}`]) {
+          if (!checks[`${w}|${c.id}|${col}`]) {
             result.push({
-              id: `ct-${w.num}-${c.id}-${col}`,
+              id: `ct-${w}-${c.id}-${col}`,
               title: `${c.code}: ${col}`,
-              notes: `Week ${w.num} · ${fmtWeekLabel(w)}`,
-              dueDate: `${w.end.getFullYear()}-${p2(w.end.getMonth()+1)}-${p2(w.end.getDate())}`,
+              notes: `Week ${w} · ${fmtTermWeek(w)}`,
+              dueDate: dueDateStr,
               courseColor: c.color,
               courseId: c.id,
-              weekNum: w.num,
-              urgent: w.num <= CURRENT_WEEK,
+              weekNum: w,
+              urgent: w <= CW,
             });
           }
         });
       });
-    });
+    }
     return result;
   })();
+
 
   // Visible calendars list for sidebar toggle
   const visibleCalIds=calendars.filter(c=>c.visible!==false).map(c=>c.id);
