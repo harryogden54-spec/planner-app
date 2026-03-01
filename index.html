@@ -180,7 +180,7 @@ function Sel({value,onChange,options,P}){
 }
 
 // ── Event Modal ───────────────────────────────────────────────────────────────
-function EventModal({ev,cals,onSave,onDel,onClose,P,mobile}){
+function EventModal({ev,occDate,cals,onSave,onDel,onClose,P,mobile}){
   const init=ev||{id:Date.now()+"",title:"",calendarId:cals[0]?.id||"",date:today(),startTime:"",endTime:"",
     isSingleTime:false,location:"",notes:"",links:"",isMultiDay:false,multiDayEnd:"",
     showColorFill:false,urgent:false,done:false,recurring:false,recurringDays:[]};
@@ -232,8 +232,13 @@ function EventModal({ev,cals,onSave,onDel,onClose,P,mobile}){
     <FR label="Location" P={P}><Inp value={f.location} onChange={e=>set("location",e.target.value)} placeholder="Where?" P={P}/></FR>
     <FR label="Notes" P={P}><Inp value={f.notes} onChange={e=>set("notes",e.target.value)} placeholder="Notes…" rows={2} P={P}/></FR>
     <FR label="Links (one per line)" P={P}><Inp value={f.links} onChange={e=>set("links",e.target.value)} placeholder="https://…" rows={2} style={{fontFamily:"monospace",fontSize:12}} P={P}/></FR>
-    <div style={{display:"flex",justifyContent:"space-between",marginTop:18}}>
-      {ev?<Btn onClick={()=>onDel(ev.id)} v="danger" P={P}>Delete</Btn>:<span/>}
+    <div style={{display:"flex",justifyContent:"space-between",marginTop:18,flexWrap:"wrap",gap:8}}>
+      {ev&&ev.recurring&&occDate&&occDate!==ev.date?
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          <Btn onClick={()=>onDel(ev.id,occDate)} v="danger" P={P} small>Delete this date</Btn>
+          <Btn onClick={()=>onDel(ev.id,null)} v="danger" P={P} small>Delete all</Btn>
+        </div>
+       :ev?<Btn onClick={()=>onDel(ev.id,null)} v="danger" P={P}>Delete</Btn>:<span/>}
       <div style={{display:"flex",gap:8}}><Btn onClick={onClose} v="ghost" P={P}>Cancel</Btn><Btn onClick={()=>onSave(f)} P={P}>Save</Btn></div>
     </div>
   </Overlay>;
@@ -280,9 +285,9 @@ function MonthView({year,month,events,tasks,cals,onDayClick,onEvClick,onAddEv,P,
     const s=ds(d);
     return events.filter(e=>{
       if(!visIds.has(e.calendarId))return false;
-      if(e.date===s)return true;
+      if(e.date===s&&!(e.skippedDates||[]).includes(s))return true;
       if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
-      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];return e.recurringDays.includes(day)&&s!==e.date;}
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
       return false;
     }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
   }
@@ -339,9 +344,9 @@ function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskTogg
   function getEvs(s){
     return events.filter(e=>{
       if(!visIds.has(e.calendarId))return false;
-      if(e.date===s)return true;
+      if(e.date===s&&!(e.skippedDates||[]).includes(s))return true;
       if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
-      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];return e.recurringDays.includes(day)&&s!==e.date;}
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
       return false;
     }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
   }
@@ -364,7 +369,7 @@ function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskTogg
           </div>
           <div style={{flex:1,padding:mobile?"8px 10px":"10px 12px",display:"flex",flexDirection:"column",gap:3,minHeight:mobile?58:66}}>
             {evs.length===0&&<div style={{fontSize:12,color:P.ink3,fontFamily:"'DM Sans',sans-serif",opacity:0.3,alignSelf:"center",marginTop:6}}>—</div>}
-            {evs.map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId),col=cal?cal.color:P.accent;const ts=ev.startTime&&ev.endTime?fmtT(ev.startTime)+"–"+fmtT(ev.endTime):ev.startTime?fmtT(ev.startTime):"";return <div key={ev.id} onClick={()=>onEvClick(ev)} style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",padding:"4px 8px",borderRadius:7,background:col+"14",transition:"background 0.12s"}} onMouseEnter={e=>e.currentTarget.style.background=col+"28"} onMouseLeave={e=>e.currentTarget.style.background=col+"14"}>
+            {evs.map(ev=>{const cal=cals.find(c=>c.id===ev.calendarId),col=cal?cal.color:P.accent;const ts=ev.startTime&&ev.endTime?fmtT(ev.startTime)+"–"+fmtT(ev.endTime):ev.startTime?fmtT(ev.startTime):"";return <div key={ev.id} onClick={()=>onEvClick(ev,day.ds)} style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",padding:"4px 8px",borderRadius:7,background:col+"14",transition:"background 0.12s"}} onMouseEnter={e=>e.currentTarget.style.background=col+"28"} onMouseLeave={e=>e.currentTarget.style.background=col+"14"}>
               <div style={{width:6,height:6,borderRadius:"50%",background:ev.done?P.ink3:col,flexShrink:0}}/>
               {ev.recurring&&<span style={{fontSize:10,color:P.ink3}}>↻</span>}
               {ts&&<span style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif",minWidth:mobile?0:72}}>{ts}</span>}
@@ -416,8 +421,14 @@ function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskTogg
 }
 
 // ── Tasks View ────────────────────────────────────────────────────────────────
-function TasksView({tasks,setTasks,P,mobile,courseTasks}){
-  const[lists,setLists]=useState(()=>lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]));
+function TasksView({tasks,setTasks,P,mobile,courseTasks,doneLSE,setDoneLSE}){
+  const LSE_ID="lse-list";
+  const[lists,setLists]=useState(()=>{
+    const saved=lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]);
+    // Ensure LSE list always exists
+    if(!saved.find(l=>l.id===LSE_ID)) return [...saved,{id:LSE_ID,name:"LSE"}];
+    return saved;
+  });
   const[active,setActive]=useState(()=>{const s=lsGet("tlists9",[{id:"list1"}]);return s[0]?.id||"list1";});
   const[modal,setModal]=useState(null);
   const[newL,setNewL]=useState("");const[addL,setAddL]=useState(false);
@@ -448,26 +459,25 @@ function TasksView({tasks,setTasks,P,mobile,courseTasks}){
         <div style={{fontSize:mobile?17:21,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{lists.find(l=>l.id===active)?.name||""}</div>
         <Btn onClick={()=>setModal({new:true})} P={P} small={mobile}>+ New Task</Btn>
       </div>
-      {courseTasks&&courseTasks.length>0&&<div style={{marginBottom:16}}>
+      {active===LSE_ID&&courseTasks&&courseTasks.length>0&&<div style={{marginBottom:16}}>
         <div style={{fontSize:11,fontWeight:600,color:P.ink3,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
-          From Courses
-          <span style={{background:P.al,color:P.accent,borderRadius:20,padding:"1px 8px",fontSize:11,fontWeight:700}}>{courseTasks.length}</span>
+          This Week's Courses
+          <span style={{background:P.al,color:P.accent,borderRadius:20,padding:"1px 8px",fontSize:11,fontWeight:700}}>{courseTasks.filter(ct=>!ct.done).length}</span>
         </div>
-        {courseTasks.map((ct,i)=><Card key={ct.id} P={P} style={{marginBottom:5,padding:"10px 14px",borderLeft:"4px solid "+(ct.cc||P.accent),animation:"slideUp 0.2s ease "+(i*15)+"ms both"}}>
+        {courseTasks.map((ct,i)=><Card key={ct.id} P={P} style={{marginBottom:5,padding:"11px 14px",borderLeft:"4px solid "+(ct.cc||P.accent),animation:"slideUp 0.2s ease "+(i*15)+"ms both",opacity:ct.done?0.45:1}}>
           <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-            <div style={{width:8,height:8,borderRadius:"50%",background:ct.cc||P.accent,flexShrink:0,marginTop:5}}/>
+            <Check checked={!!ct.done} onChange={()=>setDoneLSE(p=>({...p,[ct.id]:!p[ct.id]}))} color={ct.cc||P.accent} P={P}/>
             <div style={{flex:1}}>
-              <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:2}}>
-                {ct.urgent&&<Pill color={P.accent} bg={P.al} style={{fontSize:10}}>overdue</Pill>}
-                <span style={{fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500}}>{ct.title}</span>
-              </div>
-              <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif"}}>{ct.notes}</div>
-              <div style={{fontSize:11,color:P.accent,fontFamily:"'DM Sans',sans-serif",marginTop:2,fontWeight:500}}>Due: {ct.dueDate}</div>
+              <span style={{fontSize:mobile?13:14,color:P.ink,fontFamily:"'DM Sans',sans-serif",fontWeight:500,textDecoration:ct.done?"line-through":"none"}}>{ct.title}</span>
+              <div style={{fontSize:11,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginTop:1}}>{ct.notes}</div>
             </div>
+            <button onClick={()=>setDoneLSE(p=>({...p,[ct.id]:true}))} title="Dismiss" style={{background:"none",border:"none",cursor:"pointer",color:P.ink3,fontSize:13,opacity:0.5,transition:"opacity 0.12s"}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.5}>✕</button>
           </div>
         </Card>)}
-        <div style={{height:1,background:P.border,margin:"12px 0"}}/>
+        {courseTasks.every(ct=>ct.done)&&<div style={{fontSize:13,color:P.ink3,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic",textAlign:"center",padding:"8px 0"}}>All done for this week! 🎉</div>}
+        <div style={{height:1,background:P.border,margin:"14px 0"}}/>
       </div>}
+      {active===LSE_ID&&courseTasks&&courseTasks.length===0&&tasks.filter(t=>t.listId===active).length===0&&<Card P={P} style={{textAlign:"center",padding:38,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>All course tasks for this week are done ✓</Card>}
       {lt.length===0&&<Card P={P} style={{textAlign:"center",padding:38,color:P.ink3,fontSize:14,fontFamily:"'DM Sans',sans-serif",fontStyle:"italic"}}>Nothing here yet.</Card>}
       {lt.map((t,i)=>{const cd=countdown(t.dueDate);return <Card key={t.id} P={P} onClick={()=>setModal(t)} style={{marginBottom:6,padding:"11px 15px",borderLeft:"4px solid "+(t.urgent?P.accent:P.border),animation:"slideUp 0.25s ease "+(i*18)+"ms both",opacity:t.done?0.5:1}}>
         <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
@@ -720,7 +730,7 @@ function SearchView({events,tasks,cals,onClose,P,mobile}){
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-function SettingsView({dark,setDark,accent,setAccent,onReset,onClose,P,mobile}){
+function SettingsView({dark,setDark,accent,setAccent,onClose,P,mobile}){
   return <Overlay onClose={onClose} P={P} mobile={mobile}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
       <div style={{fontSize:18,fontWeight:700,color:P.ink,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>Settings</div>
@@ -744,8 +754,11 @@ function SettingsView({dark,setDark,accent,setAccent,onReset,onClose,P,mobile}){
       </div>
     </div>
     <div style={{borderTop:"1px solid "+P.border,paddingTop:16}}>
-      <Lbl P={P}>Data</Lbl>
-      <Btn onClick={onReset} v="danger" P={P} style={{marginTop:8,width:"100%",justifyContent:"center"}}>Reset all data</Btn>
+      <Lbl P={P}>Keyboard shortcuts</Lbl>
+      <div style={{fontSize:13,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginTop:8,lineHeight:1.8}}>
+        <kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 6px"}}>N</kbd> — new event / task<br/>
+        <kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 6px"}}>/</kbd> — search
+      </div>
     </div>
   </Overlay>;
 }
@@ -830,7 +843,19 @@ function App(){
     setWkOff(Math.round((cSun-tSun)/(7*86400000)));setHiDate(ds);switchTab("week");
   }
   function saveEvent(f){setEvents(p=>{const e=p.find(x=>x.id===f.id);return e?p.map(x=>x.id===f.id?f:x):[...p,f];});setEvModal(null);setPrefillDate(null);}
-  function delEvent(id){setEvents(p=>p.filter(e=>e.id!==id));setEvModal(null);}
+  // Delete: if recurring and a specific date is provided, skip just that occurrence
+  function delEvent(id, skipDate){
+    if(skipDate){
+      setEvents(p=>p.map(e=>{
+        if(e.id!==id)return e;
+        const skipped=[...(e.skippedDates||[]),skipDate];
+        return{...e,skippedDates:skipped};
+      }));
+    } else {
+      setEvents(p=>p.filter(e=>e.id!==id));
+    }
+    setEvModal(null);
+  }
   function wkLabel2(){const ws=wkStart,we=new Date(ws);we.setDate(ws.getDate()+6);const mo=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];return ws.getDate()+" "+mo[ws.getMonth()]+" – "+we.getDate()+" "+mo[we.getMonth()]+", "+ws.getFullYear();}
   function defLists(){return lsGet("tlists9",[{id:"list1",name:"Uni"},{id:"list2",name:"Life"}]);}
 
@@ -840,22 +865,32 @@ function App(){
   useEffect(()=>{lsSet("courses9",courses);if(sbReady.current)sched("co9",courses);},[courses]);
   useEffect(()=>{lsSet("checks9",checks);if(sbReady.current)sched("ck9",checks);},[checks]);
 
-  // Course tasks computed live — shown in week panel AND tasks tab
+  // Course tasks — ONLY current week's unchecked items, for the LSE list
+  // doneLSETasks tracks which course tasks have been manually checked off in the LSE list
+  const[doneLSE,setDoneLSE]=useState(()=>lsGet("doneLSE9",{}));
+  useEffect(()=>{lsSet("doneLSE9",doneLSE);},[doneLSE]);
+
   const courseTasks=(()=>{
     const result=[];
-    for(let w=1;w<=TW;w++){
-      courses.forEach(c=>{
-        c.columns.forEach(col=>{
-          if(!checks[w+"|"+c.id+"|"+col]){
-            result.push({id:"ct-"+w+"-"+c.id+"-"+col.replace(/\s/g,"_"),title:c.code+": "+col,notes:"Week "+w+" · "+wkLabel(w),dueDate:wkDueStr(w),cc:c.color,urgent:w<=CW});
-          }
-        });
+    const w=CW; // only current week
+    courses.forEach(c=>{
+      c.columns.forEach(col=>{
+        if(!checks[w+"|"+c.id+"|"+col]){
+          const id="ct-"+w+"-"+c.id+"-"+col.replace(/\s/g,"_");
+          result.push({
+            id, title:c.code+": "+col,
+            notes:"Week "+w+" · "+wkLabel(w),
+            dueDate:wkDueStr(w),
+            cc:c.color, urgent:false,
+            done:!!doneLSE[id],
+          });
+        }
       });
-    }
+    });
     return result;
   })();
 
-  const urgentCount=tasks.filter(t=>!t.done&&(t.urgent||(t.dueDate&&daysUntil(t.dueDate)<0))).length;
+  const urgentCount=tasks.filter(t=>!t.done&&!t.isCourseTask&&(t.urgent||(t.dueDate&&daysUntil(t.dueDate)<0))).length;
 
   const TABS=[
     {id:"month",label:"Month",Icon:({c,s})=><I.Month c={c} s={s}/>},
@@ -933,9 +968,9 @@ function App(){
           <span style={{fontSize:10,color:P.ink3,fontFamily:"'DM Sans',sans-serif",marginLeft:4}}><kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 5px",fontSize:10}}>N</kbd> add · <kbd style={{background:P.bg2,border:"1px solid "+P.border,borderRadius:4,padding:"1px 5px",fontSize:10}}>/</kbd> search</span>
         </div>
         <div style={{flex:1,overflow:"auto",padding:"20px"}}>
-          {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>{setEvModal(ev);}} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={false}/>}
-          {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={false} courseTasks={courseTasks}/>}
-          {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={false} courseTasks={courseTasks}/>}
+          {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={(ev,occDate)=>setEvModal({ev,occDate})} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={false}/>}
+          {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={(ev,occDate)=>setEvModal({ev,occDate})} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={false} courseTasks={courseTasks}/>}
+          {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={false} courseTasks={courseTasks} doneLSE={doneLSE} setDoneLSE={setDoneLSE}/>}
           {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={false}/>}
           {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={false} courses={courses} setCourses={setCourses} checks={checks} setChecks={setChecks}/>}
         </div>
@@ -959,9 +994,9 @@ function App(){
         </div>
       </div>
       <div style={{flex:1,overflow:"auto",padding:"14px 14px 78px"}}>
-        {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={true}/>}
-        {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={ev=>setEvModal(ev)} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={true} courseTasks={courseTasks}/>}
-        {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={true} courseTasks={courseTasks}/>}
+        {tab==="month"&&<MonthView key={tabKey} year={year} month={month} events={events} tasks={tasks} cals={cals} onDayClick={handleDayClick} onEvClick={(ev,occDate)=>setEvModal({ev,occDate})} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} P={P} mobile={true}/>}
+        {tab==="week"&&<WeekView key={tabKey} wkStart={wkStart} events={events} tasks={tasks} cals={cals} hiDate={hiDate} onEvClick={(ev,occDate)=>setEvModal({ev,occDate})} onAddEv={ds=>{setPrefillDate(ds);setEvModal("new");}} onTaskToggle={id=>setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t))} onTaskEdit={t=>setEditWkTask(t)} onAddTask={()=>setAddTaskModal(true)} P={P} mobile={true} courseTasks={courseTasks}/>}
+        {tab==="tasks"&&<TasksView key={tabKey} tasks={tasks} setTasks={setTasks} P={P} mobile={true} courseTasks={courseTasks} doneLSE={doneLSE} setDoneLSE={setDoneLSE}/>}
         {tab==="lists"&&<ListsView key={tabKey} lists={slists} setLists={setSlists} P={P} mobile={true}/>}
         {tab==="courses"&&<CoursesView key={tabKey} P={P} mobile={true} courses={courses} setCourses={setCourses} checks={checks} setChecks={setChecks}/>}
       </div>
@@ -976,13 +1011,13 @@ function App(){
     </div>}
 
     {/* Modals */}
-    {evModal&&<EventModal ev={evModal==="new"?null:evModal} cals={cals}
+    {evModal&&<EventModal ev={evModal==="new"?null:(evModal.ev||evModal)} occDate={evModal.occDate||null} cals={cals}
       onSave={saveEvent} onDel={delEvent} onClose={()=>{setEvModal(null);setPrefillDate(null);}}
       P={P} mobile={mobile}/>}
     {addTaskModal&&<TaskModal task={null} lists={defLists()} onSave={f=>{setTasks(p=>[...p,f]);setAddTaskModal(false);}} onDel={()=>{}} onClose={()=>setAddTaskModal(false)} P={P} mobile={mobile}/>}
     {editWkTask&&<TaskModal task={editWkTask} lists={defLists()} onSave={f=>{setTasks(p=>p.map(t=>t.id===f.id?f:t));setEditWkTask(null);}} onDel={id=>{setTasks(p=>p.filter(t=>t.id!==id));setEditWkTask(null);}} onClose={()=>setEditWkTask(null)} P={P} mobile={mobile}/>}
     {showSearch&&<SearchView events={events} tasks={tasks} cals={cals} onClose={()=>setShowSearch(false)} P={P} mobile={mobile}/>}
-    {showSettings&&<SettingsView dark={dark} setDark={setDark} accent={accent} setAccent={setAccent} onReset={doReset} onClose={()=>setShowSettings(false)} P={P} mobile={mobile}/>}
+    {showSettings&&<SettingsView dark={dark} setDark={setDark} accent={accent} setAccent={setAccent} onClose={()=>setShowSettings(false)} P={P} mobile={mobile}/>}
     <Sync on={syncing} P={P}/>
   </div>;
 }
