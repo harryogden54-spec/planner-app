@@ -48,7 +48,7 @@ async function sbSetS(k,v){try{await withTimeout(fetch(SB_URL+"/rest/v1/settings
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const DAYS_S=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
-const TERM_START=new Date("2025-01-19T00:00:00");
+const TERM_START=new Date(2025,0,19);
 const CW=6; const TW=11;
 const R=12;
 
@@ -60,7 +60,8 @@ function dim(y,m){return new Date(y,m+1,0).getDate();}
 function fdm(y,m){return new Date(y,m,1).getDay();}
 function lsGet(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
-function daysUntil(ds){if(!ds)return null;return Math.ceil((new Date(ds+"T00:00:00")-new Date(today()+"T00:00:00"))/86400000);}
+function parseDate(ds){const[y,m,d]=ds.split("-").map(Number);return new Date(y,m-1,d);}
+function daysUntil(ds){if(!ds)return null;return Math.ceil((parseDate(ds)-parseDate(today()))/86400000);}
 function countdown(ds){const d=daysUntil(ds);if(d===null)return null;if(d<0)return{label:Math.abs(d)+"d overdue",c:"#c13b2e"};if(d===0)return{label:"today",c:"#c13b2e"};if(d===1)return{label:"tomorrow",c:"#e08030"};if(d<=7)return{label:"in "+d+"d",c:"#8a7050"};return null;}
 function wkStart(n){const d=new Date(TERM_START);d.setDate(d.getDate()+(n-1)*7);return d;}
 function wkEnd(n){const d=wkStart(n);d.setDate(d.getDate()+6);return d;}
@@ -287,7 +288,7 @@ function MonthView({year,month,events,tasks,cals,onDayClick,onEvClick,onAddEv,P,
       if(!visIds.has(e.calendarId))return false;
       if(e.date===s&&!(e.skippedDates||[]).includes(s))return true;
       if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
-      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[(([y,m,d])=>new Date(y,m-1,d).getDay())(s.split("-").map(Number))];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
       return false;
     }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
   }
@@ -346,7 +347,7 @@ function WeekView({wkStart,events,tasks,cals,hiDate,onEvClick,onAddEv,onTaskTogg
       if(!visIds.has(e.calendarId))return false;
       if(e.date===s&&!(e.skippedDates||[]).includes(s))return true;
       if(e.isMultiDay&&e.multiDayEnd)return s>=e.date&&s<=e.multiDayEnd;
-      if(e.recurring&&e.recurringDays){const day=DAYS_S[new Date(s+"T00:00:00").getDay()];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
+      if(e.recurring&&e.recurringDays){const day=DAYS_S[(([y,m,d])=>new Date(y,m-1,d).getDay())(s.split("-").map(Number))];const skipped=e.skippedDates||[];return e.recurringDays.includes(day)&&s!==e.date&&!skipped.includes(s);}
       return false;
     }).sort((a,b)=>pT(a.startTime)-pT(b.startTime));
   }
@@ -837,7 +838,7 @@ function App(){
   const wkStart=getWkStart(wkOff);
 
   function handleDayClick(ds){
-    const cl=new Date(ds+"T00:00:00"),now=new Date();now.setHours(0,0,0,0);
+    const cl=parseDate(ds),now=new Date();now.setHours(0,0,0,0);
     const tSun=new Date(now);tSun.setDate(now.getDate()-now.getDay());tSun.setHours(0,0,0,0);
     const cSun=new Date(cl);cSun.setDate(cl.getDate()-cl.getDay());cSun.setHours(0,0,0,0);
     setWkOff(Math.round((cSun-tSun)/(7*86400000)));setHiDate(ds);switchTab("week");
